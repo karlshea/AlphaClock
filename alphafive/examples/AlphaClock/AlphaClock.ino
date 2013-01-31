@@ -1,6 +1,20 @@
-
-
 /*
+
+AlphaClock.ino 
+
+Firmware for the Alpha Clock Five by William B Phelps
+Version 2.1.0 - 30 January 2013
+GPS and DST support Copyright 2013 (c) William B. Phelps - all commercial rights reserved
+
+CHANGES:
+
+- single point time/date fetch to keep values in sync
+- fix bug if time changes while setting date
+- fix bug when Month (& Day) wrap
+- allow turning alarm off when snoozing
+
+ ------------------------------------------------------------
+
 Alpha_20.ino 
  
  -- Alpha Clock Five Firmware, version 2.0 --
@@ -45,28 +59,24 @@ Alpha_20.ino
  You should have received a copy of the GNU General Public License
  along with this library.  If not, see <http://www.gnu.org/licenses/>.
  
- 
- 
  Note that the two word lists included with this distribution are NOT licensed under the GPL.
  - The list in fiveletterwords.h is derived from SCOWL, http://wordlist.sourceforge.net 
  Please see README-SCOWL.txt for copyright restrictions on the use and redistribution of this word list.
  - The alternative list in fiveletterwordspd.h is in the PUBLIC DOMAIN, 
  and cannot be restricted by the GPL or other copyright licenses.    
- 	  
+
  */
 
+#include <Time.h>       // The Arduino Time library, http://www.arduino.cc/playground/Code/Time
+#include <Wire.h>       // For optional RTC module
+#include <DS1307RTC.h>  // For optional RTC module. (This library included with the Arduino Time library)
+#include <EEPROM.h>     // For saving settings 
 
 #include "alphafive.h"      // Alpha Clock Five library
 
 // Comment out exactly one of the following two lines
 #include "fiveletterwords.h"   // Standard word list --
 //#include "fiveletterwordspd.h" // Public domain alternative
-
-
-#include <Time.h>       // The Arduino Time library, http://www.arduino.cc/playground/Code/Time
-#include <Wire.h>       // For optional RTC module
-#include <DS1307RTC.h>  // For optional RTC module. (This library included with the Arduino Time library)
-#include <EEPROM.h>     // For saving settings 
 
 // "Factory" default configuration can be configured here:
 #define a5brightLevelDefault 9 
@@ -91,8 +101,6 @@ int8_t NightLightType;
 byte NightLightSign;
 unsigned int NightLightStep; 
 
-
-
 // Configuration menu:
 byte menuItem;   //Current position within options menu
 int8_t optionValue; 
@@ -110,8 +118,6 @@ int8_t optionValue;
 #define SetSecondsMenuItem 9 
 #define AltModeMenuItem 10 
 
-
-
 // Clock display mode:
 int8_t DisplayMode;   
 int8_t DisplayModeLocalLast;
@@ -124,8 +130,8 @@ byte modeLEDTest;
 byte UpdateEE; 
 int8_t numberCharSet;
 
-
 // Other global variables:
+time_t tNow;  // set each pass thru Loop
 byte UseRTC;
 unsigned long NextClockUpdate, NextAlarmCheck;
 unsigned long milliTemp;
@@ -140,23 +146,20 @@ byte wordSequence;
 byte wordSequenceStep;
 byte modeShowText;
 
-
 byte RedrawNow, RedrawNow_NoFade;
-
 
 // Button Management:
 #define ButtonCheckInterval 20    // Time delay between responding to button state, ms
 #define HoldDownTime 2000         // How long to hold buttons to acces smenus requiring holding two buttons
+
 byte buttonStateLast;
 byte buttonMonitor;
 unsigned long Btn1_AlrmSet_StartTime, Btn2_TimeSet_StartTime, Btn3_Plus_StartTime, Btn4_Minus_StartTime;
 unsigned long NextButtonCheck, LastButtonPress;
 
-
 byte UpdateAlarmState, UpdateBrightness;
 byte AlarmTimeChanged, TimeChanged;
 byte holdDebounce;
-
 
 // Brightness steps for manual brightness adjustment
 byte Brightness;
@@ -171,11 +174,10 @@ byte SecLast;
 byte MinNowOnesLast;
 byte MinAlarmOnesLast;
 
-
 //Alarm variables
 byte AlarmTimeSnoozeMin;
 byte AlarmTimeSnoozeHr;
-byte snoozed;
+byte alarmSnoozed;
 byte alarmPrimed;
 byte alarmNow;
 
@@ -215,18 +217,12 @@ void decrementAlarm(void)
 
 void TurnOffAlarm(void)
 { // This stops the alarm when it is going off. It does not disable the alarm.
-  if (alarmNow){
-    snoozed = 0;
-    alarmNow = 0;
-    a5noTone();
-
-    if (modeShowMenu == 0) 
-      DisplayWordSequence(2); // Display: "ALARM OFF", EXCEPT if we are in the menus.
-  }
+  if ( (alarmNow || alarmSnoozed) && (modeShowMenu == 0) )
+    DisplayWordSequence(2); // Display: "ALARM OFF", EXCEPT if we are in the menus.
+  alarmSnoozed = 0;
+  alarmNow = 0;
+  a5noTone();
 }
-
-
-
 
 
 void checkButtons(void )
@@ -265,14 +261,14 @@ void checkButtons(void )
           else{
             alarmNow = 0;
             a5noTone();
-            snoozed = 1; 
+            alarmSnoozed = 1; 
 
             a5editFontChar ('a', 54, 1, 37);    // Define special character
             DisplayWord ("SNaZE", 1500);  
 
-            AlarmTimeSnoozeMin = minute() + 9;
-            AlarmTimeSnoozeHr = hour();
-
+            AlarmTimeSnoozeMin = minute(tNow) + 9;
+            AlarmTimeSnoozeHr = hour(tNow);
+            
             if  ( AlarmTimeSnoozeMin > 59){
               AlarmTimeSnoozeMin -= 60;
               AlarmTimeSnoozeHr += 1;
@@ -322,7 +318,7 @@ void checkButtons(void )
       // If TimeSet button was just released::
       if (( (buttonMonitor & a5_timeSetBtn) == 0) && (buttonStateLast & a5_timeSetBtn))
       {
-        if ((alarmNow) || (snoozed)){  // Just Turn Off Alarm 
+        if ((alarmNow) || (alarmSnoozed)){  // Just Turn Off Alarm 
           TurnOffAlarm();
         } 
         else {  // If we are in a configuration menu
@@ -355,7 +351,6 @@ void checkButtons(void )
       /////////////////////////////  Time-Of-Day Adjustments  /////////////////////////////  
 
       // Check to see if both time-set button and plus button are both currently depressed:
-
       if (( buttonMonitor & a5_TimeSetPlusBtns) == a5_TimeSetPlusBtns) 
         if (TimeChanged < 2)
         {        
@@ -400,7 +395,6 @@ void checkButtons(void )
       //    the Set Time button is not down,
       //    and no other high-priority modes are enabled...
 
-
       if (( buttonMonitor & a5_alarmSetBtn) && (modeShowAlarmTime == 0))
         if ((( buttonMonitor & a5_timeSetBtn) == 0) && (modeShowText == 0))
           if ( milliTemp >= (Btn1_AlrmSet_StartTime + 40 ))  // of those "ifs," Check hold-time LAST.
@@ -417,7 +411,7 @@ void checkButtons(void )
           incrementAlarm(); // Add one minute
           RedrawNow = 1; 
           TimeChanged = 2;  // One-time press: detected
-          snoozed = 0;  //  Recalculating alarm time *turns snooze off.*
+          alarmSnoozed = 0;  //  Recalculating alarm time *turns snooze off.*
         }       
         else if ( milliTemp >= (Btn3_Plus_StartTime + 400))
         {
@@ -433,7 +427,7 @@ void checkButtons(void )
           decrementAlarm(); // Subtract one minute
           RedrawNow = 1; 
           TimeChanged = 2; // One-time press: detected
-          snoozed = 0;  //  Recalculating alarm time *turns snooze off.*
+          alarmSnoozed = 0;  //  Recalculating alarm time *turns snooze off.*
         }      
         else if ( milliTemp >  (Btn4_Minus_StartTime + 400))
         {
@@ -441,7 +435,6 @@ void checkButtons(void )
           RedrawNow_NoFade = 1; 
           //          TimeChanged = 1;         
         }
-
 
       // Check to see if both S1 and S2 are both currently depressed:
       if (( buttonMonitor & a5_alarmSetBtn) && ( buttonMonitor & a5_timeSetBtn))
@@ -454,9 +447,8 @@ void checkButtons(void )
         }
       } 
 
-
-
       /////////////////////////////  ENTERING & LEAVING LED TEST MODE  /////////////////////////////  
+
       // Check to see if both S1 and S2 are both currently held down:
       if (( buttonMonitor & a5_alarmSetBtn) && ( buttonMonitor & a5_timeSetBtn))
       {
@@ -481,7 +473,6 @@ void checkButtons(void )
         }
       }
 
-
       // Check to see if AlarmSet button was JUST released::
       if ( ((buttonMonitor & a5_alarmSetBtn) == 0) && (buttonStateLast & a5_alarmSetBtn))
       {  
@@ -489,7 +480,6 @@ void checkButtons(void )
           modeShowAlarmTime = 0; 
           RedrawNow = 1;
         } 
-
         if (modeShowDateViaButtons == 1)
         {
           modeShowDateViaButtons = 0;
@@ -497,13 +487,12 @@ void checkButtons(void )
         } 
       }
 
-
       // If TimeSet button was just released::
       if (( (buttonMonitor & a5_timeSetBtn) == 0) && (buttonStateLast & a5_timeSetBtn))
       {
         if (holdDebounce)
         { 
-          if ((alarmNow) || (snoozed)){  // Just Turn Off Alarm 
+          if ((alarmNow) || (alarmSnoozed)){  // Just Turn Off Alarm 
             TurnOffAlarm();
           } 
           else if (TimeChanged == 0){  // If the time has just been adjusted, DO NOT change alarm status.
@@ -525,7 +514,6 @@ void checkButtons(void )
 
       }
 
-
       if (( (buttonMonitor & a5_plusBtn) == 0) && (buttonStateLast & a5_plusBtn))
       { // The "+" button has just been released.
         if (holdDebounce)
@@ -534,7 +522,6 @@ void checkButtons(void )
             TimeChanged = 1;  // Acknowledge that the button has been released, for purposes of time editing. 
           if (AlarmTimeChanged > 0)
             AlarmTimeChanged = 1;  // Acknowledge that the button has been released, for purposes of time editing. 
-
           // IF no other buttons are down, increase brightness:
           if (((buttonMonitor & a5_allButtonsButPlus) == 0) && (AlarmTimeChanged + TimeChanged == 0))
             if (Brightness < BrightnessMax)
@@ -565,8 +552,6 @@ void checkButtons(void )
         }
       }
     } // End not-in-config-menu statements
-
-
 
     /////////////////////////////  ENTERING & LEAVING CONFIG MENU  /////////////////////////////  
 
@@ -603,7 +588,6 @@ void checkButtons(void )
 
 void DisplayMenuOptionName(void){
   // Display title of menu name after switching to new menu utem.
-
   switch (menuItem) {
   case NightLightMenuItem:
     DisplayWordSequence(4);  // Night Light
@@ -644,8 +628,6 @@ void DisplayMenuOptionName(void){
     break;
   }
 }
-
-
 
 
 void ManageAlarm (void) {
@@ -759,9 +741,6 @@ void ManageAlarm (void) {
 }
 
 
-
-
-
 void DisplayWordSequence (byte sequence)
 {  // Usage:  // DisplayWordSequence(1); // displays "HELLO" "WORLD"
 
@@ -818,7 +797,6 @@ void DisplayWordSequence (byte sequence)
       wordSequence = 0;
     break; 
   case 5: //Display "VER20" " LED " "TEST "  // Display software version number, 2.0
-
     if (wordSequenceStep == 1){
       DisplayWord ("VER20", 2000);
       DisplayWordDP("___1_");
@@ -842,7 +820,6 @@ void DisplayWordSequence (byte sequence)
     else
       wordSequence = 0;
     break;
-
   case 7:     //Display "FONT " "STYLE"
     if (wordSequenceStep == 1)
       DisplayWord ("FONT ", 700);
@@ -853,7 +830,6 @@ void DisplayWordSequence (byte sequence)
     else
       wordSequence = 0;
     break;
-
   case 8:     //Display "CLOCK" "STYLE"
     if (wordSequenceStep == 1)
       DisplayWord ("CLOCK", 700);
@@ -876,10 +852,6 @@ void DisplayWordSequence (byte sequence)
     else
       wordSequence = 0;
     break;    
-
-
-
-
   default: 
     // Turn off word sequences. (Catches case 0.)
     wordSequence = 0;
@@ -888,17 +860,14 @@ void DisplayWordSequence (byte sequence)
 }
 
 
-
 void DisplayWord (char WordIn[], unsigned int duration)
 { // Usage: DisplayWord ("ALARM", 500); 
-
   modeShowText = 1;  
   wordCache[0] = WordIn[0];
   wordCache[1] = WordIn[1];
   wordCache[2] = WordIn[2];
   wordCache[3] = WordIn[3];
   wordCache[4] = WordIn[4];
-
   DisplayWordEndTime = milliTemp + duration;
   RedrawNow = 1; 
 }
@@ -908,16 +877,12 @@ void DisplayWordDP (char WordIn[])
   // Usage: DisplayWord ("_123_"); 
   // Add or edit decimals for text displayed via DisplayWord().
   // Call in conjuction with DisplayWord, just before or after.
-
   dpCache[0] = WordIn[0];
   dpCache[1] = WordIn[1];
   dpCache[2] = WordIn[2];
   dpCache[3] = WordIn[3];
   dpCache[4] = WordIn[4];
 }
-
-
-
 
 
 void  EndVCRmode(){ 
@@ -968,9 +933,6 @@ void setup() {
     setTime(0,0,0,1, 1, 2012);
   }
 
-
-
-
   SerialPrintTime(); 
   NextClockUpdate = millis() + 1;
 
@@ -984,7 +946,7 @@ void setup() {
   modeLEDTest = 0;
 
   // Alarm Setup:
-  snoozed = 0;
+  alarmSnoozed = 0;
   alarmPrimed = 0;
   alarmNow = 0; 
   SoundSequence = 0; 
@@ -1002,15 +964,12 @@ void setup() {
   RedrawNow_NoFade = 0;
   UpdateBrightness = 0;
 
-
-
   DisplayWordSequence(1);  // Display: Hello world
 
   buttonMonitor = a5GetButtons(); 
   if (( buttonMonitor & a5_alarmSetBtn) && ( buttonMonitor & a5_timeSetBtn))
   {
     // If Alarm button and Time button (LED Test buttons) held down at turn on, reset to defaults.
-
     Brightness = a5brightLevelDefault; 
     HourMode24 = a5HourMode24Default; 
     AlarmEnabled = a5AlarmEnabledDefault; 
@@ -1020,11 +979,9 @@ void setup() {
     NightLightType = a5NightLightTypeDefault;   
     numberCharSet = a5NumberCharSetDefault; 
     DisplayMode = a5DisplayModeDefault;       
-
     wordSequenceStep = 0;
     DisplayWord ("*****", 1000); 
   }
-
 
   a5_brightLevel = MBlevel[Brightness];
   a5_brightMode = MBmode[Brightness]; 
@@ -1044,6 +1001,7 @@ void setup() {
 
 void loop() {
 
+  tNow = now();  // fetch time & date (wbp)
   milliTemp = millis();
   checkButtons();
 
@@ -1071,7 +1029,7 @@ void loop() {
   if (VCRmode) 
   {
     if (modeShowText == 0){
-      byte temp = second() & 1; 
+      byte temp = second(tNow) & 1; 
       if((temp) && (VCRmode == 1))
       {
         a5_brightLevel = 0;  
@@ -1113,11 +1071,6 @@ void loop() {
 
     if (UpdateEE)   // Don't need to check this more than 100 times/second.
       EESaveSettings();
-
-
-
-
-
   }
 
   // Check for alarm:
@@ -1126,15 +1079,15 @@ void loop() {
     NextAlarmCheck = milliTemp +  500;  // Check again in 1/2 second. 
 
     if (AlarmEnabled)  {
-      byte hourTemp = hour();
-      byte minTemp = minute();
+      byte hourTemp = hour(tNow);
+      byte minTemp = minute(tNow);
 
       if ((AlarmTimeHr == hourTemp ) && (AlarmTimeMin == minTemp ))
       {
         if (alarmPrimed){ 
           alarmPrimed = 0;
           alarmNow = 1;
-          snoozed = 0; 
+          alarmSnoozed = 0; 
           SoundSequence = 0; 
         }
       }
@@ -1143,30 +1096,25 @@ void loop() {
         // Prevent alarm from going off twice in the same minute, after being turned off and back on.
       }
 
-      if (snoozed)
+      if (alarmSnoozed)
         if  ((AlarmTimeSnoozeHr == hourTemp ) && (AlarmTimeSnoozeMin == minTemp ))
         {
           alarmNow = 1;
-          snoozed = 0; 
+          alarmSnoozed = 0; 
           SoundSequence = 0; 
         }
     }
   }
 
-
   if (alarmNow)
     ManageAlarm();
-
-
 
   if(Serial.available() ) 
   { 
     processSerialMessage();
   } 
 
-
 }
-
 
 
 #define a5_COMM_MSG_LEN  13   // time sync to PC is HEADER followed by unix time_t as ten ascii digits  (Was 11)
@@ -1204,8 +1152,6 @@ void processSerialMessage() {
   byte i, temp, temp2;
   int8_t paramNo, valueNo;
   char OutputCache[13]; 
-
-
 
   // if time sync available from serial port, update time and return true
   while(Serial.available() >=  a5_COMM_MSG_LEN ){  // time message consists of a header and ten ascii digits
@@ -1349,11 +1295,9 @@ void processSerialMessage() {
         }
       }
 
-
     }
   }
 }
-
 
 
 void updateNightLight(void)
@@ -1415,9 +1359,12 @@ void UpdateDisplay (byte forceUpdate) {
     if ((milliTemp >= DisplayWordEndTime) && (modeShowText == 1))
     {
       modeShowText = 0;
+
+
       if (wordSequence)
         DisplayWordSequence(wordSequence);  
       // If the word sequence is finished, return to clock display:
+
       if (wordSequence == 0) 
         RedrawNow = 1; 
     } 
@@ -1707,12 +1654,10 @@ void UpdateDisplay (byte forceUpdate) {
   {
     // Time Display Mode!  Possibly with aux. display.
 
-
     if ((DisplayMode > 3) && (DisplayMode < 32))
     {
 
-
-      if (buttonMonitor) 
+		if (buttonMonitor) 
       {
         // Do not use alternate display modes when buttons are pressed.
         DisplayModePhase = 0;
@@ -1731,15 +1676,13 @@ void UpdateDisplay (byte forceUpdate) {
           forceUpdate = 1;
 
           DisplayWord ("     ", 400);  // Blank out between display phases 
+
           if (AlarmEnabled)  
             DisplayWordDP("2____");
           else
             DisplayWordDP("_____"); 
 
         }
-
-
-
 
       if (DisplayModePhase == 0)
       {
@@ -1764,24 +1707,34 @@ void UpdateDisplay (byte forceUpdate) {
 
 void AdjDayMonthYear (int8_t AdjDay, int8_t AdjMonth, int8_t AdjYear)
 {
-  int yrTmp = year() + (int) AdjYear; 
-  setTime(hour(),minute(),second(),day() + AdjDay,month() + AdjMonth,yrTmp);
+  tNow = now();  // wbp
+  int yrTmp = year(tNow) + (int) AdjYear;  //wbp
+  int moTmp = month(tNow) + AdjMonth;
+  if (moTmp < 1)
+    moTmp = 12;
+  else if (moTmp > 12)
+    moTmp = 1;
+  int daTmp = day(tNow) + AdjDay;
+  if (daTmp < 1)
+    daTmp = 31;
+  else if (daTmp > 31)
+    daTmp = 1;
+  setTime(hour(tNow),minute(tNow),second(tNow),daTmp,moTmp,yrTmp);  //wbp
   if (UseRTC)  
     RTC.set(now()); 
 }
 
 
-
-
 void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
   byte temp;
+
   char units;
   char WordIn[] = {
     "     "                                                                                                                                      };
   byte SecNowTens,  SecNowOnes;
   byte SecNow;
 
-  SecNow = second();
+  SecNow = second(tNow);
 
   if (SecLast != SecNow){
     forceUpdateCopy = 1;
@@ -1802,7 +1755,7 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
     if (DisplayModeLocal == 20)
       temp = AlarmTimeHr;  
     else
-      temp = hour(); 
+      temp = hour(tNow); 
 
     if (HourMode24) 
       units = 'H';  
@@ -1828,7 +1781,7 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
     if (DisplayModeLocal == 20)
       temp = AlarmTimeMin;
     else
-      temp = minute(); 
+      temp = minute(tNow); 
 
     MinNowTens = U8DIVBY10(temp);      //i.e.,  MinNowTens = temp / 10;
     MinNowOnes = temp - 10 * MinNowTens;
@@ -1836,14 +1789,13 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
     if (MinNowOnesLast != MinNowOnes)
       forceUpdateCopy = 1;
 
-    SecNow = second();    
+    SecNow = second(tNow);    
 
     if (SecLast != SecNow)
       forceUpdateCopy = 1;
 
     if (DisplayModeLocal & 1) // Seconds Spinner Mode
     {
-
 
       // binary tree for 8 cases:  three tests max, rather than 8.
       // Split seconds into octants: 0-6,7-14,15-22,23-29,30-36,37-44,45-52,53-59
@@ -1927,9 +1879,10 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
       if (AlarmEnabled)
         a5loadOSB_DP("2____",a5_brightLevel);     
 
-      if ((DisplayModeLocal < 20) && (DisplayModeLocal & 2) && (SecNow & 1)){ 
+			if ((DisplayModeLocal < 20) && (DisplayModeLocal & 2) && (SecNow & 1)) { 
         // no HOUR:MINUTE separators
       }
+
       else
         a5loadOSB_DP("01200",a5_brightLevel);    
 
@@ -1937,7 +1890,6 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
     }  
 
     MinNowOnesLast = MinNowOnes;  
-
   }
 
   else if (DisplayModeLocal == 32)  //Seconds only
@@ -1955,6 +1907,7 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
       a5clearOSB();  
       a5loadOSB_Ascii(WordIn,a5_brightLevel);    
 
+
       if (AlarmEnabled)
         a5loadOSB_DP("21200",a5_brightLevel);     
       else
@@ -1970,9 +1923,9 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
 
     if(forceUpdateCopy)
     {  
-      temp = day();  
+      temp = day(tNow);  
 
-      byte monthTemp = 3 * ( month() - 1);  
+      byte monthTemp = 3 * ( month(tNow) - 1);  
       //Month name (short):
       //      char a5monthShortNames_P[] PROGMEM = "JANFEBMARAPRMAYJUNJULAUGSEPOCTNOVDEC";
       WordIn[0] = pgm_read_byte(&(a5_monthShortNames_P[monthTemp++]));  
@@ -1987,6 +1940,7 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
       a5clearOSB();  
       a5loadOSB_Ascii(WordIn,a5_brightLevel);    
 
+
       if (AlarmEnabled)
         a5loadOSB_DP("20100",a5_brightLevel);     
       else
@@ -1999,7 +1953,7 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
   else if (DisplayModeLocal == 35)  //Year
   { 
 
-    unsigned int yeartemp = year();  
+    unsigned int yeartemp = year(tNow);  
     unsigned int divtemp =  U16DIVBY10(yeartemp);  //i.e.,  divtemp = yeartemp / 10;
 
     WordIn[4] =   yeartemp - 10 * divtemp + a5_integerOffset;  
@@ -2015,6 +1969,7 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
       a5clearOSB();  
       a5loadOSB_Ascii(WordIn,a5_brightLevel);    
 
+
       if (AlarmEnabled)
         a5loadOSB_DP("20000",a5_brightLevel);     
       else
@@ -2025,8 +1980,6 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
   }
   else if (DisplayModeLocal == 36)  //FLW - FIVE LETTER WORD mode
   {
-
-
 
     if(forceUpdateCopy)
     {  
@@ -2063,8 +2016,6 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
       if (temp < 50)
         WordIn[0] = 'Z'; 
 
-
-
       a5clearOSB(); 
       a5loadOSB_Ascii(WordIn,a5_brightLevel);    
 
@@ -2079,24 +2030,24 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
 
   DisplayModeLocalLast = DisplayModeLocal;
   SecLast = SecNow; 
-
 }
 
 
 void SerialPrintTime(){
   //   Print time over serial interface.   Adapted from Time library.
+  tNow = now();  // wbp
 
-  Serial.print(hour());
-  printDigits(minute());
-  printDigits(second());
+  Serial.print(hour(tNow));
+  printDigits(minute(tNow));
+  printDigits(second(tNow));
   Serial.print(" ");
-  Serial.print(dayStr(weekday()));
+  Serial.print(dayStr(weekday(tNow)));
   Serial.print(" ");
-  Serial.print(day());
+  Serial.print(day(tNow));
   Serial.print(" ");
-  Serial.print(monthShortStr(month()));
+  Serial.print(monthShortStr(month(tNow)));
   Serial.print(" ");
-  Serial.print(year()); 
+  Serial.print(year(tNow)); 
   Serial.println(); 
 
 }
@@ -2122,8 +2073,8 @@ void ApplyDefaults (void) {
   AlarmTone =       a5AlarmToneDefault;
   NightLightType =  a5NightLightTypeDefault;  
   numberCharSet =   a5NumberCharSetDefault;
-}
 
+}
 
 
 void EEReadSettings (void) {  
@@ -2190,8 +2141,6 @@ void EEReadSettings (void) {
   else  
     DisplayMode = value;       
 
-
-
 }
 
 
@@ -2257,6 +2206,7 @@ void EESaveSettings (void){
       indicateEEPROMwritten = 1;
     }      
 
+
     if (indicateEEPROMwritten) { // Blink LEDs off to indicate when we're writing to the EEPROM 
       DisplayWord ("     ", 100);  
     }
@@ -2266,6 +2216,4 @@ void EESaveSettings (void){
       RTC.set(now());  // Update time at RTC, in case time was changed in settings menu
   }
 } 
-
-
 
