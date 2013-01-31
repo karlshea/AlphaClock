@@ -13,6 +13,8 @@ FIXES:
 - allow turning alarm off when snoozing
 CHANGES:
 - rewrite DisplayWord/DisplayWordSequence
+- 2 segment seconds spinner
+- blink alarm indicator if alarm sounding or snoozed
 
  ------------------------------------------------------------
 
@@ -1623,7 +1625,7 @@ void UpdateDisplay (byte forceUpdate) {
 
           DisplayWord ("     ", 400);  // Blank out between display phases 
 
-          if (AlarmEnabled)  
+          if (AlarmIndicate())  
             DisplayWordDP("2____");
           else
             DisplayWordDP("_____"); 
@@ -1650,6 +1652,14 @@ void UpdateDisplay (byte forceUpdate) {
   }
 }
 
+boolean AlarmIndicate (void)
+{
+  if ( AlarmEnabled && ( ((alarmNow == 0) && (alarmSnoozed == 0)) || (second(tNow)%2)) )  // flash alarm indicator if alarm going or snoozed
+    return(true);
+  else
+    return(false);
+}
+
 
 void AdjDayMonthYear (int8_t AdjDay, int8_t AdjMonth, int8_t AdjYear)
 {
@@ -1673,6 +1683,7 @@ void AdjDayMonthYear (int8_t AdjDay, int8_t AdjMonth, int8_t AdjYear)
 
 void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
   byte temp;
+  byte temp1, temp2;  // wbp
 
   char units;
   char WordIn[] = {
@@ -1742,60 +1753,14 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
 
     if (DisplayModeLocal & 1) // Seconds Spinner Mode
     {
-
-      // binary tree for 8 cases:  three tests max, rather than 8.
       // Split seconds into octants: 0-6,7-14,15-22,23-29,30-36,37-44,45-52,53-59
-
-      if (SecNow < 30)
-      {// temp in range 0-29
-        if (SecNow < 15)
-        {// temp in range 0-14
-          if (SecNow < 7)
-          { // temp in range 0-6 
-            temp = 15;   //  a5editFontChar('a',0,0,32);    // N arrow
-          }
-          else 
-          { // temp in range 7-14
-            temp = 16; // a5editFontChar('a',0,0,64);    // NE arrow
-          } 
-        }
-        else
-        {// temp in range 15-29
-          if (SecNow < 23)
-          {  // temp in range 15-22
-            temp = 5;  // a5editFontChar('a',32,0,0);    // E arrow 
-          }
-          else
-          {  // temp in range 23-29
-            temp = 17;  // a5editFontChar('a',0,0,128);    // SE arrow
-          }   
-        }
-      }
-      else
-      {// temp in range 30-59
-        if (SecNow < 45)
-        {// temp in range 30-44 
-          if (SecNow < 37)
-          {  // temp in range 30-36
-            temp = 8;  // a5editFontChar('a',0,1,0);    // S arrow
-          }
-          else 
-          {   // temp in range 37-44
-            temp = 9;  // a5editFontChar('a',0,2,0);    // SW arrow
-          }  
-        }
-        else
-        {// temp in range 45-59
-          if (SecNow < 53)
-          {  // temp in range 45-52
-            temp = 4;  //  a5editFontChar('a',16,0,0);    // W arrow
-          }
-          else 
-          {   // temp in range 53-59
-            temp = 14;  // a5editFontChar('a',0,0,16);    // NW arrow     
-          }     
-        }
-      } 
+      // segment to display:         15,   16,    5,   17,    8,    9,    4,   14 
+//    byte segs[] = { 15, 16, 5, 17, 8, 9, 4, 14};  // wbp
+//    temp = segs[(SecNow*2)/15];  // wbp
+    byte segs1[] = { 15, 15, 16, 16, 5, 5, 17, 17, 8, 8, 9, 9, 4, 4, 14, 14};  // wbp
+    byte segs2[] = { 0,  16,  0,  5, 0, 17, 0,  8, 0, 9, 0, 4, 0, 14, 0, 15};  // wbp
+    temp1 = segs1[(SecNow*4)/15];  // wbp
+    temp2 = segs2[(SecNow*4)/15];  // wbp
     }
 
     if ((HourMode24) || (HrNowTens > 0))
@@ -1817,15 +1782,17 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
 
       if (DisplayModeLocal & 1)
       {
-        a5loadOSB_Segment (temp, a5_brightLevel);
+        a5loadOSB_Segment (temp1, a5_brightLevel);  // wbp
+        if (temp2 > 0)  // wbp
+          a5loadOSB_Segment (temp2, a5_brightLevel);  // wbp
         if (units == 'P')
           a5loadOSB_DP("___1_",a5_brightLevel);   // DP dot in DisplayMode 1.        
       }
 
-      if (AlarmEnabled)
+      if (AlarmIndicate())
         a5loadOSB_DP("2____",a5_brightLevel);     
 
-			if ((DisplayModeLocal < 20) && (DisplayModeLocal & 2) && (SecNow & 1)) { 
+      if ((DisplayModeLocal < 20) && (DisplayModeLocal & 2) && (SecNow & 1)) { 
         // no HOUR:MINUTE separators
       }
 
@@ -1854,7 +1821,7 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
       a5loadOSB_Ascii(WordIn,a5_brightLevel);    
 
 
-      if (AlarmEnabled)
+      if (AlarmIndicate())
         a5loadOSB_DP("21200",a5_brightLevel);     
       else
         a5loadOSB_DP("01200",a5_brightLevel);     
@@ -1887,7 +1854,7 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
       a5loadOSB_Ascii(WordIn,a5_brightLevel);    
 
 
-      if (AlarmEnabled)
+      if (AlarmIndicate())
         a5loadOSB_DP("20100",a5_brightLevel);     
       else
         a5loadOSB_DP("00100",a5_brightLevel);     
@@ -1916,7 +1883,7 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
       a5loadOSB_Ascii(WordIn,a5_brightLevel);    
 
 
-      if (AlarmEnabled)
+      if (AlarmIndicate())
         a5loadOSB_DP("20000",a5_brightLevel);     
       else
         a5loadOSB_DP("00000",a5_brightLevel);     
@@ -1965,7 +1932,7 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
       a5clearOSB(); 
       a5loadOSB_Ascii(WordIn,a5_brightLevel);    
 
-      if (AlarmEnabled)
+      if (AlarmIndicate())
         a5loadOSB_DP("20000",a5_brightLevel);     
       else
         a5loadOSB_DP("00000",a5_brightLevel);     
