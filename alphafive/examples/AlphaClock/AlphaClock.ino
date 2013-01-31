@@ -6,12 +6,13 @@ Firmware for the Alpha Clock Five by William B Phelps
 Version 2.1.0 - 30 January 2013
 GPS and DST support Copyright 2013 (c) William B. Phelps - all commercial rights reserved
 
-CHANGES:
-
+FIXES:
 - single point time/date fetch to keep values in sync
 - fix bug if time changes while setting date
 - fix bug when Month (& Day) wrap
 - allow turning alarm off when snoozing
+CHANGES:
+- rewrite DisplayWord/DisplayWordSequence
 
  ------------------------------------------------------------
 
@@ -142,9 +143,17 @@ unsigned long DisplayWordEndTime;
 char wordCache[5];
 char dpCache[5];
 
-byte wordSequence;
+//byte wordSequence;
 byte wordSequenceStep;
 byte modeShowText;
+
+// Word Display variables
+char Word1[5];
+char Word2[5];
+char Word3[5];
+char Word4[5];
+unsigned int wordDuration;
+byte wordCount;
 
 byte RedrawNow, RedrawNow_NoFade;
 
@@ -218,7 +227,7 @@ void decrementAlarm(void)
 void TurnOffAlarm(void)
 { // This stops the alarm when it is going off. It does not disable the alarm.
   if ( (alarmNow || alarmSnoozed) && (modeShowMenu == 0) )
-    DisplayWordSequence(2); // Display: "ALARM OFF", EXCEPT if we are in the menus.
+    DisplayWords("ALARM", "END  ", 800); // Display: "ALARM OFF", EXCEPT if we are in the menus.
   alarmSnoozed = 0;
   alarmNow = 0;
   a5noTone();
@@ -466,8 +475,10 @@ void checkButtons(void )
           else
           { 
             // Display version and enter LED Test Mode
+            DisplayWords("V21WM", " LED ", "TEST ", 2000);
+            wordDuration = 1000;  // shorter duration for the rest
+            DisplayWordDP("_1___");
             modeLEDTest = 1;
-            DisplayWordSequence(5); 
             SoundSequence = 0;
           }
         }
@@ -590,40 +601,40 @@ void DisplayMenuOptionName(void){
   // Display title of menu name after switching to new menu utem.
   switch (menuItem) {
   case NightLightMenuItem:
-    DisplayWordSequence(4);  // Night Light
+    DisplayWords("NIGHT", "LIGHT", 600);  // Night Light
     break;
   case AlarmToneMenuItem:
-    DisplayWordSequence(6);  // Alarm Tone
+    DisplayWords("ALARM", "TONE ", 700);  // Alarm Tone
     break; 
   case SoundTestMenuItem:
-    DisplayWordSequence(3); // Sound-test menu item, 3.  Display "TEST" "SOUND" "USE+-"
+    DisplayWords("SOUND", "TEST ", 600); // Sound-test menu item, 3.  Display "TEST" "SOUND" "USE+-"
     break;
   case numberCharSetMenuItem:
-    DisplayWordSequence(7); // Font Style
+    DisplayWords("FONT ", "STYLE", 600); // Font Style
     break;
   case DisplayStyleMenuItem:
-    DisplayWordSequence(8); // Clock Style
+    DisplayWords("CLOCK", "STYLE", 600); // Clock Style
     break;
   case SetYearMenuItem:
-    DisplayWord ("YEAR ", 800); 
+    DisplayWord("YEAR ", 800); 
     DisplayWordDP("___12");
     break;
   case SetMonthMenuItem:
-    DisplayWord ("MONTH", 800);   
+    DisplayWord("MONTH", 800);   
     break;      
   case SetDayMenuItem:
-    DisplayWord ("DAY  ", 800);  
+    DisplayWord("DAY  ", 800);  
     DisplayWordDP("__12_");
     break;       
   case SetSecondsMenuItem:
-    DisplayWord ("SECS ", 800);  
+    DisplayWord("SECS ", 800);  
     DisplayWordDP("___12");
     break;   
   case AltModeMenuItem:  
-    DisplayWordSequence(9); // "TIME AND..."
-    //    DisplayWord ("ALTW/", 2000);  
+    DisplayWords("TIME ", "AND..", 900);
+    //    DisplayWord("ALTW/", 2000);  
     //   DisplayWordDP("__11_");
-    break; 
+    break;
   default:  // do nothing!
     break;
   }
@@ -741,121 +752,56 @@ void ManageAlarm (void) {
 }
 
 
-void DisplayWordSequence (byte sequence)
-{  // Usage:  // DisplayWordSequence(1); // displays "HELLO" "WORLD"
+void DisplayWords (char WordIn1[], unsigned int duration)
+{
+  DisplayWords(WordIn1, "", "", "", duration, 1);
+}
+void DisplayWords (char WordIn1[], char WordIn2[], unsigned int duration)
+{
+  DisplayWords(WordIn1, WordIn2, "", "", duration, 2);
+}
+void DisplayWords (char WordIn1[], char WordIn2[], char WordIn3[], unsigned int duration)
+{
+  DisplayWords(WordIn1, WordIn2, WordIn3, "", duration, 3);
+}
+void DisplayWords (char WordIn1[], char WordIn2[], char WordIn3[], char WordIn4[], unsigned int duration)
+{
+  DisplayWords(WordIn1, WordIn2, WordIn3, WordIn4, duration, 4);
+}
+void DisplayWords (char WordIn1[], char WordIn2[], char WordIn3[], char WordIn4[], unsigned int duration, byte count)
+{
+  wordSequenceStep = 0;
+//  wordSequence = count;  // anything that isn't zero
+  strncpy(Word1, WordIn1, 5);
+  strncpy(Word2, WordIn2, 5);
+  strncpy(Word3, WordIn3, 5);
+  strncpy(Word4, WordIn4, 5);
+  wordDuration = duration;
+  wordCount = count;
+  DisplayWordSequence();  // start the display 
+}
 
-  if (sequence != wordSequence)
-  {
-    wordSequence = sequence;
-    wordSequenceStep = 0;
-  }
-
-  DisplayWordDP("_____"); // Blank DPs unless stated otherwise.
+void DisplayWordSequence ()
+{
   wordSequenceStep++;
-
-  switch (sequence) {
-  case 1:     //Display "HELLO" "WORLD"
+  DisplayWordDP("_____"); // Blank DPs unless stated otherwise.
+  if (wordSequenceStep < wordCount*2+1)
+  {
     if (wordSequenceStep == 1)
-      DisplayWord ("HELLO", 800);
+      DisplayWord(Word1, wordDuration);
     else if (wordSequenceStep == 3)
-      DisplayWord ("WORLD", 800);
-    else if (wordSequenceStep < 5)
-      DisplayWord ("     ", 300);
-    else
-      wordSequence = 0;
-    break;
-  case 2:  //Display "ALARM" " OFF "
-    if (wordSequenceStep == 1)
-      DisplayWord ("ALARM", 800);
-    else if (wordSequenceStep == 3)
-      DisplayWord (" OFF ", 800);
-    else if (wordSequenceStep < 5)
-      DisplayWord ("     ", 100);
-    else
-      wordSequence = 0;
-    break;
-  case 3:  //Display "TEST" "SOUND" "USE+-"
-    if (wordSequenceStep == 1)
-      DisplayWord ("TEST ", 600); 
-    else if (wordSequenceStep == 3)
-      DisplayWord ("SOUND", 600);
+      DisplayWord(Word2, wordDuration);
     else if (wordSequenceStep == 5)
-      DisplayWord ("USE+-", 600);
-    else if (wordSequenceStep < 7)
-      DisplayWord ("     ", 200);
+      DisplayWord(Word3, wordDuration);
+    else if (wordSequenceStep == 7)
+      DisplayWord(Word4, wordDuration);
     else
-      wordSequence = 0;
-    break;
-  case 4: //Display "NIGHT" "LIGHT"
-    if (wordSequenceStep == 1)
-      DisplayWord ("NIGHT", 600); 
-    else if (wordSequenceStep == 3)
-      DisplayWord ("LIGHT", 600);
-    else if (wordSequenceStep < 5)
-      DisplayWord ("     ", 100);
-    else
-      wordSequence = 0;
-    break; 
-  case 5: //Display "VER20" " LED " "TEST "  // Display software version number, 2.0
-    if (wordSequenceStep == 1){
-      DisplayWord ("VER20", 2000);
-      DisplayWordDP("___1_");
-    }
-    else if (wordSequenceStep == 3)
-      DisplayWord (" LED ", 1000);
-    else if (wordSequenceStep == 5)
-      DisplayWord ("TEST ", 1000);
-    else if (wordSequenceStep < 7)
-      DisplayWord ("     ", 200); 
-    else
-      wordSequence = 0; 
-    break;
-  case 6:     //Display "ALARM" "TONE"
-    if (wordSequenceStep == 1)
-      DisplayWord ("ALARM", 700);
-    else if (wordSequenceStep == 3)
-      DisplayWord (" TONE", 700);
-    else if (wordSequenceStep < 5)
-      DisplayWord ("     ", 100);
-    else
-      wordSequence = 0;
-    break;
-  case 7:     //Display "FONT " "STYLE"
-    if (wordSequenceStep == 1)
-      DisplayWord ("FONT ", 700);
-    else if (wordSequenceStep == 3)
-      DisplayWord ("STYLE", 700);
-    else if (wordSequenceStep < 5)
-      DisplayWord ("     ", 100);
-    else
-      wordSequence = 0;
-    break;
-  case 8:     //Display "CLOCK" "STYLE"
-    if (wordSequenceStep == 1)
-      DisplayWord ("CLOCK", 700);
-    else if (wordSequenceStep == 3)
-      DisplayWord ("STYLE", 700);
-    else if (wordSequenceStep < 5)
-      DisplayWord ("     ", 100);
-    else
-      wordSequence = 0;
-    break;    
-  case 9:     //Display "TIME" "AND..."
-    if (wordSequenceStep == 1)
-      DisplayWord ("TIME ", 900); 
-    else if (wordSequenceStep == 3){ 
-      DisplayWord ("AND  ", 900);
-      DisplayWordDP("__111"); 
-    }
-    else if (wordSequenceStep < 5)
-      DisplayWord ("     ", 100);
-    else
-      wordSequence = 0;
-    break;    
-  default: 
-    // Turn off word sequences. (Catches case 0.)
-    wordSequence = 0;
-    wordSequenceStep = 0;
+      DisplayWord("     ", 200);
+  }
+  else
+  {
+//    wordSequence = 0;  // done with sequence, turn it off
+    wordCount = 0;  // all done
   }
 }
 
@@ -957,14 +903,14 @@ void setup() {
   UpdateEE = 0;
   LastButtonPress = NextClockUpdate;
 
-  wordSequence = 0;
+  wordCount = 0;
   wordSequenceStep = 0;
 
   RedrawNow = 1;
   RedrawNow_NoFade = 0;
   UpdateBrightness = 0;
 
-  DisplayWordSequence(1);  // Display: Hello world
+  DisplayWords("ALPHA", "CLOCK", "  5  ", "     ", 750);  // Display: Hello world
 
   buttonMonitor = a5GetButtons(); 
   if (( buttonMonitor & a5_alarmSetBtn) && ( buttonMonitor & a5_timeSetBtn))
@@ -1361,11 +1307,11 @@ void UpdateDisplay (byte forceUpdate) {
       modeShowText = 0;
 
 
-      if (wordSequence)
-        DisplayWordSequence(wordSequence);  
+      if (wordCount)
+        DisplayWordSequence();  
       // If the word sequence is finished, return to clock display:
 
-      if (wordSequence == 0) 
+      if (wordCount == 0) 
         RedrawNow = 1; 
     } 
     else
@@ -2208,7 +2154,7 @@ void EESaveSettings (void){
 
 
     if (indicateEEPROMwritten) { // Blink LEDs off to indicate when we're writing to the EEPROM 
-      DisplayWord ("     ", 100);  
+      DisplayWord ("SAVED", 100);  
     }
 
     UpdateEE = 0;
