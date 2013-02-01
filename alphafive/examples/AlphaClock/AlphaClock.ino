@@ -12,6 +12,7 @@ FIXES:
 - fix bug when Month (& Day) wrap
 - allow turning alarm off when snoozing
 - entering menu mode cancels LED test mode
+- don't repeat on Menu & Test buttons
 
 CHANGES:
 - rewrite DisplayWord/DisplayWordSequence
@@ -21,7 +22,8 @@ CHANGES:
 - Automatic DST (currently for US only)
 - set time & date from GPS
 
-- Hold S1+S2 to enter menu, S3+S4 to enter test mode (optional feature)
+OPTIONAL:
+- Hold S1+S2 to enter menu, S3+S4 to enter test mode
 
 TODO:
 - add DST configuration to menu
@@ -86,7 +88,7 @@ Alpha_20.ino
 #define FEATURE_WmGPS
 
 // Use S1+S2 for Menu, S3+S4 for test mode
-//#define MENU_S1S2
+#define MENU_S1S2
 
 #include <Time.h>       // The Arduino Time library, http://www.arduino.cc/playground/Code/Time
 #include <Wire.h>       // For optional RTC module
@@ -367,6 +369,7 @@ void checkButtons(void )
         TurnOffAlarm();
         if (modeShowMenu) // If we are currently in the configuration menu, 
         { 
+          modeShowDateViaButtons = 0;  // don't show date on exit
           modeShowMenu = 0;  //  Exit configuration menu     
           DisplayWord("     ", 500); 
         }
@@ -391,7 +394,7 @@ void checkButtons(void )
     }
 #else
     // Check to see if both S3 and S4 are both currently pressed or held down:
-    if (( buttonMonitor & a5_plusBtn) && ( buttonMonitor & a5_minusBtn))
+    if (( buttonMonitor & a5_plusBtn) && ( buttonMonitor & a5_minusBtn) && holdDebounce)
     {
       if( (milliTemp >= (Btn3_Plus_StartTime + MenuHoldDownTime )) && (milliTemp >= (Btn4_Minus_StartTime + MenuHoldDownTime )))
       {  
@@ -581,21 +584,10 @@ void checkButtons(void )
         }
       }
 #else
-      // Check to see if both S1 and S2 are both currently depressed:
-      if (( buttonMonitor & a5_alarmSetBtn) && ( buttonMonitor & a5_timeSetBtn))
-      {  
-        if (modeShowDateViaButtons == 0)
-        { // Display date
-          modeShowDateViaButtons = 1;
-          TimeChanged  = 1; // This overrides the usual alarm on/off function of the time set button. 
-          RedrawNow = 1; 
-        }
-      } 
-
       /////////////////////////////  ENTERING & LEAVING LED TEST MODE  /////////////////////////////  
 
-      // Check to see if both S1 and S2 are both currently held down:
-      if (( buttonMonitor & a5_alarmSetBtn) && ( buttonMonitor & a5_timeSetBtn))
+      // Check to see if both S1 and S2 are both currently depressed or held down:
+      if (( buttonMonitor & a5_alarmSetBtn) && ( buttonMonitor & a5_timeSetBtn) && holdDebounce)
       {
         if( (milliTemp >= (Btn1_AlrmSet_StartTime + TestHoldDownTime )) && (milliTemp >= (Btn2_TimeSet_StartTime + TestHoldDownTime )))
         {
@@ -604,6 +596,7 @@ void checkButtons(void )
           holdDebounce = 0;
           if (modeLEDTest) // If we are currently in the LED Test mode,
           {
+            modeShowDateViaButtons = 0;  // reset Date display
             modeLEDTest = 0;  //  Exit LED Test Mode    
             RedrawNow = 1; 
             DisplayWord("-END-", 1500);
@@ -616,6 +609,15 @@ void checkButtons(void )
             DisplayWordDP("_1___");
             modeLEDTest = 1;
             SoundSequence = 0;
+          }
+        }
+        else  // both buttons down but not held
+        {  
+          if (modeShowDateViaButtons == 0)
+          { // Display date
+            modeShowDateViaButtons = 1;
+            TimeChanged  = 1; // This overrides the usual alarm on/off function of the time set button. 
+            RedrawNow = 1; 
           }
         }
       }
@@ -933,7 +935,7 @@ void DisplayWordSequence ()
 
 
 void DisplayWord (char WordIn[], unsigned int duration)
-{ // Usage: DisplayWord ("ALARM", 500); 
+{ // Usage: DisplayWord("ALARM", 500); 
   modeShowText = 1;  
   wordCache[0] = WordIn[0];
   wordCache[1] = WordIn[1];
@@ -946,7 +948,7 @@ void DisplayWord (char WordIn[], unsigned int duration)
 
 void DisplayWordDP (char WordIn[])
 {
-  // Usage: DisplayWordDP ("_123_"); 
+  // Usage: DisplayWordDP("_123_"); 
   // Add or edit decimals for text displayed via DisplayWord().
   // Call in conjuction with DisplayWord, just before or after.
   dpCache[0] = WordIn[0];
