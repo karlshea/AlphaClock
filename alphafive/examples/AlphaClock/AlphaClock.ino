@@ -11,6 +11,8 @@ FIXES:
 - fix bug if time changes while setting date
 - fix bug when Month (& Day) wrap
 - allow turning alarm off when snoozing
+- entering menu mode cancels LED test mode
+
 CHANGES:
 - rewrite DisplayWord/DisplayWordSequence
 - 2 segment seconds spinner
@@ -312,6 +314,34 @@ void checkButtons(void )
     if (modeShowMenu || buttonMonitor)
       LastButtonPress = milliTemp;  //Reset EEPROM Save Timer if menu shown, or if a button pressed.
 
+
+    /////////////////////////////  ENTERING & LEAVING CONFIG MENU  /////////////////////////////  
+    // Check to see if both S3 and S4 are both currently pressed or held down:
+    if (( buttonMonitor & a5_plusBtn) && ( buttonMonitor & a5_minusBtn))
+    {
+      if( (milliTemp >= (Btn3_Plus_StartTime + HoldDownTime )) && (milliTemp >= (Btn4_Minus_StartTime + HoldDownTime )))
+      {  
+        Btn3_Plus_StartTime = milliTemp;     // Reset hold-down timer
+        Btn4_Minus_StartTime = milliTemp;    // Reset hold-down timer
+        holdDebounce = 0;
+        TurnOffAlarm();
+        if (modeShowMenu) // If we are currently in the configuration menu, 
+        { 
+          modeShowMenu = 0;  //  Exit configuration menu     
+          DisplayWord ("     ", 500); 
+        }
+        else
+        {
+          modeLEDTest = 0;  //  Exit LED Test Mode if on
+          modeShowDateViaButtons = 0;  // stop showing date
+          modeShowMenu = 1;  // Enter configuration menu 
+          menuItem = 0; 
+          DisplayWord ("     ", 500); 
+        }
+      }
+    }
+
+
     if (modeShowMenu && holdDebounce){    // Button behavior, when in Config menu mode:
 
       // Check to see if AlarmSet button was JUST released::
@@ -565,33 +595,6 @@ void checkButtons(void )
         }
       }
     } // End not-in-config-menu statements
-
-    /////////////////////////////  ENTERING & LEAVING CONFIG MENU  /////////////////////////////  
-
-    // Check to see if both S3 and S4 are both currently held down:
-    if (( buttonMonitor & a5_plusBtn) && ( buttonMonitor & a5_minusBtn))
-    {
-
-      if( (milliTemp >= (Btn3_Plus_StartTime + HoldDownTime )) && (milliTemp >= (Btn4_Minus_StartTime + HoldDownTime )))
-      {  
-        Btn3_Plus_StartTime = milliTemp;     // Reset hold-down timer
-        Btn4_Minus_StartTime = milliTemp;    // Reset hold-down timer
-        holdDebounce = 0;
-        TurnOffAlarm();
-        if (modeShowMenu) // If we are currently in the configuration menu, 
-        { 
-          modeShowMenu = 0;  //  Exit configuration menu     
-          DisplayWord ("     ", 500); 
-        }
-        else
-        {
-          modeShowMenu = 1;  // Enter configuration menu 
-          menuItem = 0; 
-          DisplayWord ("     ", 500); 
-        }
-
-      }
-    }
 
     buttonStateLast = buttonMonitor;
     buttonMonitor = 0;
