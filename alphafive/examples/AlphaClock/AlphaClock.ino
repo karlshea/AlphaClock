@@ -13,6 +13,7 @@ FIXES:
 - allow turning alarm off when snoozing
 - entering menu mode cancels LED test mode
 - don't repeat on Menu & Test buttons
+- fix bug in menu display for 1 word items
 
 CHANGES:
 - rewrite DisplayWord/DisplayWordSequence
@@ -477,6 +478,7 @@ void checkButtons(void )
         }
 
 
+
       /////////////////////////////  ENTERING & LEAVING LED TEST MODE  /////////////////////////////  
 
       // Check to see if both S1 and S2 are both currently depressed or held down:
@@ -602,6 +604,9 @@ void checkButtons(void )
 
 
 void DisplayMenuOptionName(void){
+  // Turn off word sequence if running
+  wordCount = 0;
+  wordSequenceStep = 0;
   // Display title of menu name after switching to new menu utem.
   switch (menuItem) {
   case NightLightMenuItem:
@@ -1974,6 +1979,7 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
       else
         a5loadOSB_DP("00000",a5_brightLevel);     
 
+
       a5BeginFadeToOSB(); 
     }   
   }
@@ -2094,6 +2100,8 @@ void EEReadSettings (void) {
 }
 
 
+
+
 void EESaveSettings (void){ 
 
   // If > 4 seconds since last button press, and
@@ -2158,7 +2166,7 @@ void EESaveSettings (void){
 
 
     if (indicateEEPROMwritten) { // Blink LEDs off to indicate when we're writing to the EEPROM 
-      DisplayWord("SAVED", 100);  
+      DisplayWord("SAVED", 200);  
     }
 
     UpdateEE = 0;
