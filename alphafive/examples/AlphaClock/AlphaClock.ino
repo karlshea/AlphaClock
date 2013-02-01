@@ -18,6 +18,12 @@ CHANGES:
 - 2 segment seconds spinner
 - blink alarm indicator if alarm sounding or snoozed
 
+- Automatic DST (currently for US only)
+- set time & date from GPS
+
+TODO:
+- add DST configuration to menu
+
  ------------------------------------------------------------
 
 Alpha_20.ino 
@@ -71,6 +77,11 @@ Alpha_20.ino
  and cannot be restricted by the GPL or other copyright licenses.    
 
  */
+ 
+// Defining these enables the corresponding feature
+// Note - GPS support has not been tested without AUTODST enabled
+#define FEATURE_AUTODST
+#define FEATURE_WmGPS
 
 #include <Time.h>       // The Arduino Time library, http://www.arduino.cc/playground/Code/Time
 #include <Wire.h>       // For optional RTC module
@@ -78,6 +89,13 @@ Alpha_20.ino
 #include <EEPROM.h>     // For saving settings 
 
 #include "alphafive.h"      // Alpha Clock Five library
+
+#ifdef FEATURE_AUTODST
+#include "adst.h"
+#endif
+#ifdef FEATURE_WmGPS
+#include "gps.h"  // wbp GPS support
+#endif
 
 // Comment out exactly one of the following two lines
 #include "fiveletterwords.h"   // Standard word list --
@@ -93,6 +111,14 @@ Alpha_20.ino
 #define a5AlarmToneDefault 2
 #define a5NumberCharSetDefault 2;
 #define a5DisplayModeDefault 0;
+#ifdef FEATURE_AUTODST
+#define a5DSTModeDefault 0;  // default no DST
+#endif
+#ifdef FEATURE_WmGPS
+#define a5GPSModeDefault 0;  // default no GPS
+#define a5TZHourDefault -8;  // default Pacific Time zone
+#define a5TZMinutesDefault 0;  // default Pacific Time zone
+#endif
 
 // Clock mode variables
 
@@ -122,6 +148,15 @@ int8_t optionValue;
 #define SetDayMenuItem 8
 #define SetSecondsMenuItem 9 
 #define AltModeMenuItem 10 
+
+#ifdef FEATURE_AUTODST
+#define DSTMenuItem 11
+#endif
+#ifdef FEATURE_WmGPS
+#define GPSMenuItem 12
+#define TZHoursMenuItem 13
+#define TZMinutesMenuItem 14
+#endif
 
 // Clock display mode:
 int8_t DisplayMode;   
@@ -640,6 +675,22 @@ void DisplayMenuOptionName(void){
     //    DisplayWord("ALTW/", 2000);  
     //   DisplayWordDP("__11_");
     break;
+#ifdef FEATURE_AUTODST
+  case DSTMenuItem:
+    DisplayWord("DST  ", 800);
+    break;
+#endif
+#ifdef FEATURE_Wm_GPS
+  case GPSMenuItem:
+    DisplayWord("GPS  ", 800);
+    break;
+  case TZHoursMenuItem:
+    DisplayWords("TIME ", "ZONE ", "HOUR ", 600);  // Time Zone Hour
+    break;
+  case TZMinutesMenuItem:
+    DisplayWords("TIME ", "ZONE ", "MIN  ", 600);  // Time Zone Min
+    break;
+#endif
   default:  // do nothing!
     break;
   }
@@ -857,6 +908,13 @@ void setup() {
   Serial.println("\nHello, World.");
   Serial.println("Alpha Clock Five here, reporting for duty!");   
 
+#ifdef FEATURE_WmGPS
+  Serial1.end();  // close serial1 opened by a5Init
+  Serial1.begin(9600);  // re-open at 9600 bps for GPS
+  GPSinit(96);  // assume 9600 bps (Adafruit Ultimate GPS)
+  Serial.println("GPS on Serial1 enabled");
+#endif
+
   EEReadSettings(); // Read settings stored in EEPROM
 
   if (Brightness == 0)
@@ -883,6 +941,11 @@ void setup() {
     Serial.println("Setting the date to 2012. I didn't exist in 1970.");   
     setTime(0,0,0,1, 1, 2012);
   }
+
+#ifdef FEATURE_AUTODST
+  if (DST_mode)
+    DSTinit(now(), DST_Rules);  // re-compute DST start, end
+#endif
 
   SerialPrintTime(); 
   NextClockUpdate = millis() + 1;
@@ -930,6 +993,12 @@ void setup() {
     NightLightType = a5NightLightTypeDefault;   
     numberCharSet = a5NumberCharSetDefault; 
     DisplayMode = a5DisplayModeDefault;       
+#ifdef FEATURE_AUTODST
+    DST_mode = a5DSTModeDefault;
+#endif
+#ifdef FEATURE_WmGPS
+    GPS_mode = a5GPSModeDefault;
+#endif
     wordSequenceStep = 0;
     DisplayWord ("*****", 1000); 
   }
@@ -1064,6 +1133,14 @@ void loop() {
   { 
     processSerialMessage();
   } 
+
+#ifdef FEATURE_WmGPS
+  if (GPS_mode)
+  {
+    if (Serial1.available())  //wbp
+      getGPSdata();  //wbp
+  }
+#endif
 
 }
 
@@ -1580,6 +1657,71 @@ void UpdateDisplay (byte forceUpdate) {
       }   
       TimeDisplay(32, forceUpdate); // Show clock time, seconds
     }    
+ 
+ #ifdef FEATURE_AUTODST
+   else if (menuItem == DSTMenuItem)
+    {
+      DST_mode += optionValue;
+
+      if (DST_mode < 0)
+        DST_mode = 2;
+      if (DST_mode > 2)
+        DST_mode = 0;
+
+      optionValue = 0;
+
+      if (DST_mode == 0) 
+        DisplayWord (" OFF", 500);
+      else if (DST_mode == 1) 
+        DisplayWord (" ON  ", 500);  
+      else // (DST_mode == 2) 
+        DisplayWord (" AUTO", 500);  
+      ExtendTextDisplay = 1;
+    }
+#endif
+ 
+#ifdef FEATURE_WmGPS
+   else if (menuItem == GPSMenuItem)
+    {
+      GPS_mode += optionValue;
+
+      if (GPS_mode < 0)
+        GPS_mode = 2;
+      if (GPS_mode > 2)
+        GPS_mode = 0;
+
+      optionValue = 0;
+
+      if (GPS_mode == 0) 
+        DisplayWord (" OFF", 500);
+      else if (GPS_mode == 1) 
+        DisplayWord (" ON48", 500);  
+      else // (GPS_mode == 2) 
+        DisplayWord (" ON96", 500);  
+      ExtendTextDisplay = 1;
+    }
+
+   else if (menuItem == TZHoursMenuItem)
+    {
+      TZ_hour += optionValue;
+      if (TZ_hour < -12)
+        TZ_hour = 12;
+      if (TZ_hour > 12)
+        TZ_hour = -12;
+      optionValue = 0;
+      TimeDisplay(41, forceUpdate); // Show TZ hour
+    }
+   else if (menuItem == TZMinutesMenuItem)
+    {
+      TZ_minutes += optionValue*15;
+      if (TZ_minutes < 0)
+        TZ_minutes = 45;
+      if (TZ_minutes > 45)
+        TZ_minutes = 0;
+      optionValue = 0;
+      TimeDisplay(42, forceUpdate); // Show TZ minutes
+    }
+#endif
 
     if(forceUpdate && ExtendTextDisplay)
     {  
@@ -1684,6 +1826,37 @@ void AdjDayMonthYear (int8_t AdjDay, int8_t AdjMonth, int8_t AdjYear)
 }
 
 
+#if defined FEATURE_WmGPS || defined FEATURE_AUTODST
+void setDSToffset(uint8_t mode) {
+  int8_t adjOffset;
+  uint8_t newOffset;
+#ifdef FEATURE_AUTODST
+  if (mode == 2) {  // Auto DST
+    if (DST_updated) return;  // already done it once today
+    newOffset = getDSToffset(now(), DST_Rules);  // get current DST offset based on DST Rules
+  }
+  else
+#endif // FEATURE_AUTODST
+    newOffset = mode;  // 0 or 1
+  adjOffset = newOffset - DST_offset;  // offset delta
+  if (adjOffset == 0)  return;  // nothing to do
+  if (adjOffset > 0)
+    a5tone(1200, 100);  // spring ahead
+  else
+    a5tone(600, 100);  // spring ahead
+  time_t tNow = now();  // fetch current time & date
+  tNow += adjOffset * SECS_PER_HOUR;  // add or subtract new DST offset
+  setTime(tNow);  
+  DST_updated = true;
+  if (UseRTC)  
+    RTC.set(now()); 
+  DST_offset = newOffset;
+//  eeprom_update_byte(&b_DST_offset, g_DST_offset);
+  // save DST_updated in ee ???
+}
+#endif
+
+
 void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
   byte temp;
   byte temp1, temp2;  // wbp
@@ -1693,6 +1866,17 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
     "     "                                                                                                                                      };
   byte SecNowTens,  SecNowOnes;
   byte SecNow;
+
+#ifdef FEATURE_AUTODST
+// see if it's time to check for DST changes
+  if (second(tNow)%10 == 0)  // check DST Offset every 10 seconds (60?)
+    setDSToffset(DST_mode); 
+  if ((hour(tNow) == 0) && (minute(tNow) == 0) && (second(tNow) == 0)) {  // MIDNIGHT!
+    DST_updated = false;
+    if (DST_mode == 2)  // if DST set to Auto
+      DSTinit(tNow, DST_Rules);  // re-compute DST start, end
+  }
+#endif
 
   SecNow = second(tNow);
 
@@ -1794,11 +1978,29 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
 
       if (AlarmIndicate())
         a5loadOSB_DP("2____",a5_brightLevel);     
+				
+#ifdef FEATURE_WmGPS
+      if (GPSupdating)  // wbp
+        a5loadOSB_DP("____2",a5_brightLevel);  // wbp
 
-      if ((DisplayModeLocal < 20) && (DisplayModeLocal & 2) && (SecNow & 1)) { 
+      if ((DisplayModeLocal < 20) && (DisplayModeLocal & 2) )  // flashing separator?
+      { 
+        // flashing colon
+        if ( (GPS_mode>0) && (abs((now()-tGPSupdate)>300)) )  // if no GPS signal for 5 minutes, alternate flash colon
+        {
+          if (SecNow & 1)
+            a5loadOSB_DP("00200",a5_brightLevel);  // non-flashing separator
+          else
+            a5loadOSB_DP("01000",a5_brightLevel);  // non-flashing separator
+        }
+        else if ((SecNow & 1) == 0)  // flash on even seconds
+          a5loadOSB_DP("01200",a5_brightLevel);  // non-flashing separator
+      }
+#else
+      if ((DisplayModeLocal < 20) && (DisplayModeLocal & 2) && (SecNow & 1)){ 
         // no HOUR:MINUTE separators
       }
-
+#endif				
       else
         a5loadOSB_DP("01200",a5_brightLevel);    
 
@@ -1944,6 +2146,49 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
     }   
   }
 
+#ifdef FEATURE_WmGPS
+  else if (DisplayModeLocal == 41)  // Time Zone Hour
+  {
+    unsigned int temp1 = abs(TZ_hour);  
+
+    if (TZ_hour < 0)
+      WordIn[1] = '-';
+    WordIn[2] =  U16DIVBY10(temp1) + a5_integerOffset;
+    WordIn[3] =  temp1%10 + a5_integerOffset; 
+
+    if(forceUpdateCopy)
+    { 
+      a5clearOSB();  
+      a5loadOSB_Ascii(WordIn,a5_brightLevel);    
+      if (AlarmIndicate())
+        a5loadOSB_DP("20000",a5_brightLevel);     
+      else
+        a5loadOSB_DP("00000",a5_brightLevel);     
+      a5BeginFadeToOSB(); 
+    } 
+
+  }
+
+  else if (DisplayModeLocal == 42)  // Time Zone Minutes
+  {
+
+    WordIn[2] =  uint8_t(TZ_minutes/10) + a5_integerOffset;
+    WordIn[3] =  TZ_minutes%10 + a5_integerOffset; 
+
+    if(forceUpdateCopy)
+    { 
+      a5clearOSB();  
+      a5loadOSB_Ascii(WordIn,a5_brightLevel);    
+      if (AlarmIndicate())
+        a5loadOSB_DP("20000",a5_brightLevel);     
+      else
+        a5loadOSB_DP("00000",a5_brightLevel);     
+      a5BeginFadeToOSB(); 
+    } 
+
+  }
+#endif
+
   DisplayModeLocalLast = DisplayModeLocal;
   SecLast = SecNow; 
 }
@@ -1989,6 +2234,14 @@ void ApplyDefaults (void) {
   AlarmTone =       a5AlarmToneDefault;
   NightLightType =  a5NightLightTypeDefault;  
   numberCharSet =   a5NumberCharSetDefault;
+#ifdef FEATURE_AUTODST
+  DST_mode =        a5GPSModeDefault;
+#endif
+#ifdef FEATURE_WmGPS
+  GPS_mode =        a5GPSModeDefault;
+  TZ_hour =         a5TZHourDefault;
+  TZ_minutes =      a5TZMinutesDefault;
+#endif
 
 }
 
@@ -2057,6 +2310,42 @@ void EEReadSettings (void) {
   else  
     DisplayMode = value;       
 
+#ifdef FEATURE_AUTODST
+  value = EEPROM.read(9);   
+  if (value > 2) 
+  {
+    DST_mode = a5DSTModeDefault;  
+  }
+  else  
+    DST_mode = value;  
+#endif		
+
+#ifdef FEATURE_WmGPS
+  value = EEPROM.read(10);   
+  if (value > 2) 
+  {
+    GPS_mode = a5GPSModeDefault;  
+  }
+  else  
+    GPS_mode = value;       
+
+  value = EEPROM.read(11);   // TZ_hour
+  if ((value > 24) || (value<0))
+  {
+    TZ_hour = a5TZHourDefault;  
+  }
+  else  
+    TZ_hour = value-12;       
+
+  value = EEPROM.read(12);   // TZ_minutes
+  if ((value > 45) || (value < 0))
+  {
+    TZ_hour = a5TZMinutesDefault;  
+  }
+  else  
+    TZ_minutes = value;       
+#endif
+
 }
 
 
@@ -2122,6 +2411,30 @@ void EESaveSettings (void){
       indicateEEPROMwritten = 1;
     }      
 
+#ifdef FEATURE_AUTODST
+    value = EEPROM.read(9);  
+    if (DST_mode != value){
+      a5writeEEPROM(9, DST_mode);  
+      indicateEEPROMwritten = 1;
+    }      
+#endif
+#ifdef FEATURE_WmGPS
+    value = EEPROM.read(10);  
+    if (GPS_mode != value){
+      a5writeEEPROM(10, GPS_mode);  
+      indicateEEPROMwritten = 1;
+    }      
+    value = EEPROM.read(11);  
+    if ((TZ_hour+12) != value){
+      a5writeEEPROM(11, TZ_hour+12);  
+      indicateEEPROMwritten = 1;
+    }      
+    value = EEPROM.read(12);  
+    if (TZ_minutes != value){
+      a5writeEEPROM(12, TZ_minutes);  
+      indicateEEPROMwritten = 1;
+    }
+#endif
 
     if (indicateEEPROMwritten) { // Blink LEDs off to indicate when we're writing to the EEPROM 
       DisplayWord ("SAVED", 100);  
