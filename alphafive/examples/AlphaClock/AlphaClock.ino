@@ -120,15 +120,15 @@ Alpha_20.ino
 #define a5AlarmMinDefault 30
 #define a5NightLightTypeDefault 0
 #define a5AlarmToneDefault 2
-#define a5NumberCharSetDefault 2;
-#define a5DisplayModeDefault 0;
+#define a5NumberCharSetDefault 2
+#define a5DisplayModeDefault 0
 #ifdef FEATURE_AUTODST
-#define a5DSTModeDefault 0;  // default no DST
+#define a5DSTModeDefault 0  // default no DST
 #endif
 #ifdef FEATURE_WmGPS
-#define a5GPSModeDefault 0;  // default no GPS
-#define a5TZHourDefault -8;  // default Pacific Time zone
-#define a5TZMinutesDefault 0;  // default Pacific Time zone
+#define a5GPSModeDefault 0  // default no GPS
+#define a5TZHourDefault -8  // default Pacific Time zone
+#define a5TZMinutesDefault 0  // default Pacific Time zone
 #endif
 
 // Clock mode variables
@@ -225,9 +225,9 @@ byte holdDebounce;
 
 // Brightness steps for manual brightness adjustment
 byte Brightness;
-#define BrightnessMax 11
-byte MBlevel[] = { 0, 1, 5,10,15,19,15,19, 5,10,15,19}; 
-byte MBmode[]  = { 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 2};
+#define BrightnessMax 12
+byte MBlevel[] = { 0, 1, 5,10,15,19,15,19, 2, 5,10,15,19}; 
+byte MBmode[]  = { 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 2};
 
 // For fade and update management: 
 byte SecLast; 
@@ -983,6 +983,12 @@ void  EndVCRmode(){
 void setup() {     
 
   a5Init();  // Required hardware init for Alpha Clock Five library functions
+
+//  a5tone(220, 100);
+//  delay(200);
+//  a5tone(2220, 100);
+//  delay(200);
+//  a5tone(220, 100);
 
   VCRmode = 1;
 
@@ -1920,10 +1926,19 @@ void setDSToffset(uint8_t mode) {
     newOffset = mode;  // 0 or 1
   adjOffset = newOffset - DST_offset;  // offset delta
   if (adjOffset == 0)  return;  // nothing to do
+  // play tones to indicate DST time adjustment, up or down
   if (adjOffset > 0)
-    a5tone(1200, 100);  // spring ahead
+  {
+    a5tone(220, 100);
+    delay(200);
+    a5tone(2220, 100);
+  }
   else
-    a5tone(600, 100);  // spring ahead
+  {
+    a5tone(2220, 100);
+    delay(200);
+    a5tone(220, 100);
+  }
   time_t tNow = now();  // fetch current time & date
   tNow += adjOffset * SECS_PER_HOUR;  // add or subtract new DST offset
   setTime(tNow);  
@@ -2355,7 +2370,6 @@ void EEReadSettings (void) {
     AlarmTimeHr = value - 100;   
 
   value = EEPROM.read(4);
-
   if ((value > 159) || (value < 100))
     AlarmTimeMin = a5AlarmMinDefault;
   else  
@@ -2373,62 +2387,47 @@ void EEReadSettings (void) {
   else  
     NightLightType = value;    
 
-
-  value = EEPROM.read(7);  
-  if (value > 9)   
-  {
+  value = EEPROM.read(7);
+  if (value > 9)
     numberCharSet = a5NumberCharSetDefault;
-  }
   else
-    numberCharSet = value;       
+    numberCharSet = value;
 
-  value = EEPROM.read(8);   
-  if (value > 31) 
-  {
-    DisplayMode = a5DisplayModeDefault;  
-  }
-  else  
-    DisplayMode = value;       
+  value = EEPROM.read(8);
+  if (value > 31)
+    DisplayMode = a5DisplayModeDefault;
+  else
+    DisplayMode = value;
 
 #ifdef FEATURE_AUTODST
-  value = EEPROM.read(9);   
-  if (value > 2) 
-  {
-    DST_mode = a5DSTModeDefault;  
-  }
-  else  
-    DST_mode = value;  
+  value = EEPROM.read(9);
+  if (value > 2)
+    DST_mode = a5DSTModeDefault;
+  else
+    DST_mode = value;
 #endif		
 
 #ifdef FEATURE_WmGPS
-  value = EEPROM.read(10);   
-  if (value > 2) 
-  {
-    GPS_mode = a5GPSModeDefault;  
-  }
+  value = EEPROM.read(10);
+  if (value > 2)
+    GPS_mode = a5GPSModeDefault;
   else  
-    GPS_mode = value;       
+    GPS_mode = value;
 
   value = EEPROM.read(11);   // TZ_hour
   if ((value > 24) || (value<0))
-  {
     TZ_hour = a5TZHourDefault;  
-  }
   else  
     TZ_hour = value-12;       
 
   value = EEPROM.read(12);   // TZ_minutes
   if ((value > 45) || (value < 0))
-  {
     TZ_hour = a5TZMinutesDefault;  
-  }
   else  
     TZ_minutes = value;       
 #endif
 
 }
-
-
 
 
 void EESaveSettings (void){ 
@@ -2449,7 +2448,6 @@ void EESaveSettings (void){
     value = EEPROM.read(0);  
     if (Brightness != (value - 100))  {
       a5writeEEPROM(0, Brightness + 100);  
-
       //NOTE:  Do not blink LEDs off to indicate saving of this value
     }
     value = EEPROM.read(1);  
@@ -2492,7 +2490,6 @@ void EESaveSettings (void){
       a5writeEEPROM(8, DisplayMode);  
       indicateEEPROMwritten = 1;
     }      
-
 #ifdef FEATURE_AUTODST
     value = EEPROM.read(9);  
     if (DST_mode != value){
