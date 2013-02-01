@@ -564,7 +564,6 @@ void checkButtons(void )
 #ifdef MENU_S1S2
       /////////////////////////////  ENTERING & LEAVING LED TEST MODE  /////////////////////////////  
 
-
       // Check to see if both S3 and S4 are both currently held down:
       if (( buttonMonitor & a5_plusBtn) && ( buttonMonitor & a5_minusBtn) && holdDebounce)
       {
@@ -2222,6 +2221,7 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
       else
         a5loadOSB_DP("00000",a5_brightLevel);     
 
+
       a5BeginFadeToOSB(); 
     }   
   }
@@ -2427,6 +2427,8 @@ void EEReadSettings (void) {
 #endif
 
 }
+
+
 
 
 void EESaveSettings (void){ 
