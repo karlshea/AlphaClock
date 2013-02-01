@@ -12,6 +12,7 @@ FIXES:
 - fix bug when Month (& Day) wrap
 - allow turning alarm off when snoozing
 - entering menu mode cancels LED test mode
+- don't repeat on Menu & Test buttons
 
 CHANGES:
 - rewrite DisplayWord/DisplayWordSequence
@@ -275,7 +276,7 @@ void checkButtons(void )
             alarmSnoozed = 1; 
 
             a5editFontChar ('a', 54, 1, 37);    // Define special character
-            DisplayWord ("SNaZE", 1500);  
+            DisplayWord("SNaZE", 1500);  
 
             AlarmTimeSnoozeMin = minute(tNow) + 9;
             AlarmTimeSnoozeHr = hour(tNow);
@@ -315,7 +316,7 @@ void checkButtons(void )
 
     /////////////////////////////  ENTERING & LEAVING CONFIG MENU  /////////////////////////////  
     // Check to see if both S3 and S4 are both currently pressed or held down:
-    if (( buttonMonitor & a5_plusBtn) && ( buttonMonitor & a5_minusBtn))
+    if (( buttonMonitor & a5_plusBtn) && ( buttonMonitor & a5_minusBtn) && holdDebounce)
     {
       if( (milliTemp >= (Btn3_Plus_StartTime + HoldDownTime )) && (milliTemp >= (Btn4_Minus_StartTime + HoldDownTime )))
       {  
@@ -326,7 +327,7 @@ void checkButtons(void )
         if (modeShowMenu) // If we are currently in the configuration menu, 
         { 
           modeShowMenu = 0;  //  Exit configuration menu     
-          DisplayWord ("     ", 500); 
+          DisplayWord("     ", 500); 
         }
         else
         {
@@ -334,7 +335,7 @@ void checkButtons(void )
           modeShowDateViaButtons = 0;  // stop showing date
           modeShowMenu = 1;  // Enter configuration menu 
           menuItem = 0; 
-          DisplayWord ("     ", 500); 
+          DisplayWord("     ", 500); 
         }
       }
     }
@@ -475,21 +476,11 @@ void checkButtons(void )
           //          TimeChanged = 1;         
         }
 
-      // Check to see if both S1 and S2 are both currently depressed:
-      if (( buttonMonitor & a5_alarmSetBtn) && ( buttonMonitor & a5_timeSetBtn))
-      {  
-        if (modeShowDateViaButtons == 0)
-        { // Display date
-          modeShowDateViaButtons = 1;
-          TimeChanged  = 1; // This overrides the usual alarm on/off function of the time set button. 
-          RedrawNow = 1; 
-        }
-      } 
 
       /////////////////////////////  ENTERING & LEAVING LED TEST MODE  /////////////////////////////  
 
-      // Check to see if both S1 and S2 are both currently held down:
-      if (( buttonMonitor & a5_alarmSetBtn) && ( buttonMonitor & a5_timeSetBtn))
+      // Check to see if both S1 and S2 are both currently depressed or held down:
+      if (( buttonMonitor & a5_alarmSetBtn) && ( buttonMonitor & a5_timeSetBtn) && holdDebounce)
       {
         if( (milliTemp >= (Btn1_AlrmSet_StartTime + 2 * HoldDownTime )) && (milliTemp >= (Btn2_TimeSet_StartTime + 2 * HoldDownTime )))
         {
@@ -498,9 +489,10 @@ void checkButtons(void )
           holdDebounce = 0;
           if (modeLEDTest) // If we are currently in the LED Test mode,
           {
+            modeShowDateViaButtons = 0;  // reset Date display
             modeLEDTest = 0;  //  Exit LED Test Mode    
             RedrawNow = 1; 
-            DisplayWord ("-END-", 1500);
+            DisplayWord("-END-", 1500);
           }
           else
           { 
@@ -510,6 +502,15 @@ void checkButtons(void )
             DisplayWordDP("_1___");
             modeLEDTest = 1;
             SoundSequence = 0;
+          }
+        }
+        else  // both buttons down but not held
+        {  
+          if (modeShowDateViaButtons == 0)
+          { // Display date
+            modeShowDateViaButtons = 1;
+            TimeChanged  = 1; // This overrides the usual alarm on/off function of the time set button. 
+            RedrawNow = 1; 
           }
         }
       }
@@ -647,7 +648,7 @@ void DisplayMenuOptionName(void){
 void ManageAlarm (void) {
 
   if ((SoundSequence == 0) && (modeShowMenu == 0))
-    DisplayWord ("ALARM", 400);  // Synchronize with sounds!  
+    DisplayWord("ALARM", 400);  // Synchronize with sounds!  
   //RedrawNow_NoFade = 1;
 
   if ( (TIMSK1 & _BV(OCIE1A)) == 0)  { // If last tone has finished   
@@ -810,7 +811,7 @@ void DisplayWordSequence ()
 
 
 void DisplayWord (char WordIn[], unsigned int duration)
-{ // Usage: DisplayWord ("ALARM", 500); 
+{ // Usage: DisplayWord("ALARM", 500); 
   modeShowText = 1;  
   wordCache[0] = WordIn[0];
   wordCache[1] = WordIn[1];
@@ -823,7 +824,7 @@ void DisplayWord (char WordIn[], unsigned int duration)
 
 void DisplayWordDP (char WordIn[])
 {
-  // Usage: DisplayWord ("_123_"); 
+  // Usage: DisplayWordDP("_123_"); 
   // Add or edit decimals for text displayed via DisplayWord().
   // Call in conjuction with DisplayWord, just before or after.
   dpCache[0] = WordIn[0];
@@ -929,7 +930,7 @@ void setup() {
     numberCharSet = a5NumberCharSetDefault; 
     DisplayMode = a5DisplayModeDefault;       
     wordSequenceStep = 0;
-    DisplayWord ("*****", 1000); 
+    DisplayWord("*****", 1000); 
   }
 
   a5_brightLevel = MBlevel[Brightness];
@@ -1122,7 +1123,7 @@ void processSerialMessage() {
             }
           }   
           setTime(pctime);   // Sync Arduino clock to the time received on the serial port
-          DisplayWord ("SYNCD", 900);
+          DisplayWord("SYNCD", 900);
           DisplayWordDP("____2"); 
           Serial.println("PC Time Sync Signal Received.");
           SerialPrintTime(); 
@@ -1381,9 +1382,9 @@ void UpdateDisplay (byte forceUpdate) {
       }
 
       if (HourMode24) 
-        DisplayWord ("24 HR", 500);
+        DisplayWord("24 HR", 500);
       else
-        DisplayWord ("AM/PM", 500);  
+        DisplayWord("AM/PM", 500);  
 
       ExtendTextDisplay = 1;
     }
@@ -1407,15 +1408,15 @@ void UpdateDisplay (byte forceUpdate) {
       optionValue = 0;
 
       if (NightLightType == 0) 
-        DisplayWord (" NONE", 500);
+        DisplayWord(" NONE", 500);
       else if (NightLightType == 1) 
-        DisplayWord (" LOW ", 500);  
+        DisplayWord(" LOW ", 500);  
       else if (NightLightType == 2) 
-        DisplayWord (" MED ", 500);  
+        DisplayWord(" MED ", 500);  
       else if (NightLightType == 3) 
-        DisplayWord (" HIGH", 500);  
+        DisplayWord(" HIGH", 500);  
       else  // (NightLightType == 4) 
-      DisplayWord ("SLEEP", 500);  
+      DisplayWord("SLEEP", 500);  
       ExtendTextDisplay = 1;
     }    
     else if (menuItem == AlarmToneMenuItem)  // Alarm Tone: 2
@@ -1428,22 +1429,22 @@ void UpdateDisplay (byte forceUpdate) {
         AlarmTone = 0;
 
       if (AlarmTone == 0) 
-        DisplayWord ("X LOW", 500);
+        DisplayWord("X LOW", 500);
       else if (AlarmTone == 1) 
-        DisplayWord (" LOW ", 500);  
+        DisplayWord(" LOW ", 500);  
       else if (AlarmTone == 2) 
-        DisplayWord (" MED ", 500);  
+        DisplayWord(" MED ", 500);  
       else if (AlarmTone == 3) 
-        DisplayWord (" HIGH", 500);   
+        DisplayWord(" HIGH", 500);   
       else if (AlarmTone == 4) 
-        DisplayWord ("SIREN", 500);   
+        DisplayWord("SIREN", 500);   
       else 
-        DisplayWord (" TINK", 500);   
+        DisplayWord(" TINK", 500);   
       ExtendTextDisplay = 1;
     }   
     else if (menuItem == SoundTestMenuItem)  // Alarm Test: 3
     {   
-      DisplayWord (" +/- ", 500);   
+      DisplayWord(" +/- ", 500);   
       if (optionValue != 0)
       { 
         if (alarmNow == 0)
@@ -1467,7 +1468,7 @@ void UpdateDisplay (byte forceUpdate) {
         a5loadAltNumbers(numberCharSet);
       }
 
-      DisplayWord ("01237", 500); // Sample font display
+      DisplayWord("01237", 500); // Sample font display
       ExtendTextDisplay = 1;
     }   
 
@@ -1524,16 +1525,16 @@ void UpdateDisplay (byte forceUpdate) {
       }
 
       if (DisplayMode & 4U)
-        DisplayWord ("DATE ", 500);
+        DisplayWord("DATE ", 500);
       else if (DisplayMode & 8U){
-        DisplayWord ("SECS ", 500);
+        DisplayWord("SECS ", 500);
         DisplayWordDP("___1_"); 
       }
       else if (DisplayMode & 16U){
-        DisplayWord ("WORDS", 500);
+        DisplayWord("WORDS", 500);
       }     
       else
-        DisplayWord (" NONE", 500);
+        DisplayWord(" NONE", 500);
 
       ExtendTextDisplay = 1;
 
@@ -1624,7 +1625,7 @@ void UpdateDisplay (byte forceUpdate) {
 
           forceUpdate = 1;
 
-          DisplayWord ("     ", 400);  // Blank out between display phases 
+          DisplayWord("     ", 400);  // Blank out between display phases 
 
           if (AlarmEnabled)  
             DisplayWordDP("2____");
@@ -2157,7 +2158,7 @@ void EESaveSettings (void){
 
 
     if (indicateEEPROMwritten) { // Blink LEDs off to indicate when we're writing to the EEPROM 
-      DisplayWord ("SAVED", 100);  
+      DisplayWord("SAVED", 100);  
     }
 
     UpdateEE = 0;
