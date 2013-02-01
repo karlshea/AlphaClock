@@ -13,6 +13,7 @@ FIXES:
 - allow turning alarm off when snoozing
 - entering menu mode cancels LED test mode
 - don't repeat on Menu & Test buttons
+- fix bug in menu display for 1 word items
 
 CHANGES:
 - rewrite DisplayWord/DisplayWordSequence
@@ -145,7 +146,6 @@ unsigned int NightLightStep;
 // Configuration menu:
 byte menuItem;   //Current position within options menu
 int8_t optionValue; 
-#define MenuItemsMax 10
 
 #define AMPM24HRMenuItem 0
 #define NightLightMenuItem 1
@@ -158,14 +158,17 @@ int8_t optionValue;
 #define SetDayMenuItem 8
 #define SetSecondsMenuItem 9 
 #define AltModeMenuItem 10 
+#define MenuItemsMax 10
 
 #ifdef FEATURE_AUTODST
 #define DSTMenuItem 11
+#define MenuItemsMax 11
 #endif
 #ifdef FEATURE_WmGPS
 #define GPSMenuItem 12
 #define TZHoursMenuItem 13
 #define TZMinutesMenuItem 14
+#define MenuItemsMax 14
 #endif
 
 // Clock display mode:
@@ -561,6 +564,7 @@ void checkButtons(void )
 #ifdef MENU_S1S2
       /////////////////////////////  ENTERING & LEAVING LED TEST MODE  /////////////////////////////  
 
+
       // Check to see if both S3 and S4 are both currently held down:
       if (( buttonMonitor & a5_plusBtn) && ( buttonMonitor & a5_minusBtn) && holdDebounce)
       {
@@ -713,6 +717,9 @@ void checkButtons(void )
 
 
 void DisplayMenuOptionName(void){
+  // Turn off word sequence if running
+  wordCount = 0;
+  wordSequenceStep = 0;
   // Display title of menu name after switching to new menu utem.
   switch (menuItem) {
   case NightLightMenuItem:
@@ -755,7 +762,7 @@ void DisplayMenuOptionName(void){
     DisplayWord("DST  ", 800);
     break;
 #endif
-#ifdef FEATURE_Wm_GPS
+#ifdef FEATURE_WmGPS
   case GPSMenuItem:
     DisplayWord("GPS  ", 800);
     break;
@@ -1463,8 +1470,8 @@ void UpdateDisplay (byte forceUpdate) {
     {
       modeShowText = 0;
 
-      if (wordCount)
-        DisplayWordSequence();  
+      if (wordCount)  // if displaying a sequence of words,
+        DisplayWordSequence();  // do the next word in the sequence
       // If the word sequence is finished, return to clock display:
 
       if (wordCount == 0) 
@@ -1936,8 +1943,7 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
   byte temp1, temp2;  // wbp
 
   char units;
-  char WordIn[] = {
-    "     "                                                                                                                                      };
+  char WordIn[] = { "     " };
   byte SecNowTens,  SecNowOnes;
   byte SecNow;
 
@@ -2076,7 +2082,7 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
       }
 #endif				
       else
-        a5loadOSB_DP("01200",a5_brightLevel);    
+        a5loadOSB_DP("01200",a5_brightLevel);  // non-flashing separator
 
       a5BeginFadeToOSB();  
     }  
@@ -2511,7 +2517,7 @@ void EESaveSettings (void){
 #endif
 
     if (indicateEEPROMwritten) { // Blink LEDs off to indicate when we're writing to the EEPROM 
-      DisplayWord("SAVED", 100);  
+      DisplayWord("SAVED", 200);  
     }
 
     UpdateEE = 0;
