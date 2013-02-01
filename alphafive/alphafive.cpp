@@ -2,8 +2,8 @@
  alphafive.cpp
  
  Part of the Alpha Five library for Arduino
- Version 2.0 - 10/22/2012
- Copyright (c) 2012 Windell H. Oskay.  All right reserved.
+ Version 2.1 - 1/31/2013
+ Copyright (c) 2013 Windell H. Oskay.  All right reserved.
  
  This library is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
