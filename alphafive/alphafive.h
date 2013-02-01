@@ -40,8 +40,27 @@
 #define a5_BUTTONMASK   15              // Locations of physical pushbuttons, PB0, PB1, PB2, PB3
 #define a5_alarmSetBtn  1				// Snooze/Set alarm button
 #define a5_timeSetBtn   2				// Set time button
-#define a5_plusBtn	    4				// + button
-#define a5_minusBtn     8				// - button
+
+#ifdef REVERSE_PMBTNS
+
+// reverse the +/- buttons (wbp)
+#define a5_plusBtn	8				// + button
+#define a5_minusBtn     4				// - button
+
+#define a5_allButtonsButAlarmSet 14
+#define a5_allButtonsButTimeSet  13
+#define a5_allButtonsButPlus      7
+#define a5_allButtonsButMinus    11
+
+#define a5_TimeSetPlusBtns  10
+#define a5_TimeSetMinusBtns  6
+#define a5_AlarmSetPlusBtns  9
+#define a5_AlarmSetMinusBtns 5
+
+#else
+
+#define a5_plusBtn	4				// + button 
+#define a5_minusBtn	8				// - button 
 
 #define a5_allButtonsButAlarmSet 14
 #define a5_allButtonsButTimeSet  13
@@ -52,6 +71,9 @@
 #define a5_TimeSetMinusBtns 10
 #define a5_AlarmSetPlusBtns  5
 #define a5_AlarmSetMinusBtns 9
+
+#endif
+
 extern int8_t a5_OSB[];
 extern int8_t a5_FadeStage;
 
@@ -64,6 +86,7 @@ extern int8_t a5_FadeStage;
 extern int8_t a5_brightLevel;
 extern byte a5_brightMode;  // 0: low brightness mode. 1: Medium. 2: High brightness mode
 extern char a5_monthShortNames_P[];
+
 
 byte a5getFontChar(char asciiChar, byte offset);
 void a5editFontChar(char asciiChar, byte A, byte B, byte C);
@@ -87,7 +110,24 @@ void a5tone(unsigned int frequency, unsigned long duration);
 void a5noTone (void);
 void a5Init (void);
 
+
 #endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

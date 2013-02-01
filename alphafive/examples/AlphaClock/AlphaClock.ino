@@ -24,6 +24,7 @@ CHANGES:
 
 OPTIONAL:
 - Hold S1+S2 to enter menu, S3+S4 to enter test mode
+- Reverse +/- buttons
 
 TODO:
 - add DST configuration to menu
@@ -89,6 +90,8 @@ Alpha_20.ino
 
 // Use S1+S2 for Menu, S3+S4 for test mode
 #define MENU_S1S2
+// Flip the +/- buttons
+#define REVERSE_PMBTNS
 
 #include <Time.h>       // The Arduino Time library, http://www.arduino.cc/playground/Code/Time
 #include <Wire.h>       // For optional RTC module
