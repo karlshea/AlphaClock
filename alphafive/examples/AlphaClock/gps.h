@@ -11,7 +11,7 @@
 #include "Arduino.h"
 
 // String buffer size:
-//#define GPSBUFFERSIZE 96 
+//#define GPSBUFFERSIZE 96
 //The year the clock was programmed, used for error checking
 //#define PROGRAMMING_YEAR 12
 
@@ -20,7 +20,7 @@ extern int8_t TZ_minutes;
 extern uint8_t DST_offset;
 
 extern byte GPS_mode;
-extern unsigned long tGPSupdate; 
+extern unsigned long tGPSupdate;
 extern byte GPSupdating;
 
 // we double buffer: read into one line and leave one for the main program
@@ -51,7 +51,7 @@ void GPSinit(uint8_t gps);
 //#elif (F_CPU == 8000000)
 //#define BRRL_4800 103
 //#define BRRL_9600 52
-//#define BRRL_192 26    
+//#define BRRL_192 26
 //#endif
 
 #endif // GPS_H_

@@ -159,7 +159,7 @@ void parseGPSdata(char *gpsBuffer) {
         if (ptr == NULL) goto GPSerror1;
         //				strncpy(gpsDate, ptr, 6);
         if (strlen(ptr) != 6) goto GPSerror1;  // check date length
-        tmp = parsedecimal(ptr); 
+        tmp = parsedecimal(ptr);
         tm.Day = tmp / 10000;
         tm.Month = (tmp / 100) % 100;
         tm.Year = tmp % 100;
@@ -173,7 +173,7 @@ void parseGPSdata(char *gpsBuffer) {
         tm.Year = y2kYearToTm(tm.Year);  // convert yy year to (yyyy-1970) (add 30)
         tNow = makeTime(tm);  // convert to time_t
         tDelta = abs(tNow-tGPSupdateUT);
-        
+
         if ((tGPSupdateUT > 0) && (tDelta > SECS_PER_DAY))  goto GPSerror2;  // GPS time jumped more than 1 day
         GPSupdating = false;  // valid GPS data received, flip the LED off
 

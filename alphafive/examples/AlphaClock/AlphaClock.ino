@@ -2072,7 +2072,7 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
 
       if (AlarmIndicate())
         a5loadOSB_DP("2____",a5_brightLevel);     
-				
+
 #ifdef FEATURE_WmGPS
       if (GPSupdating)  // wbp
         a5loadOSB_DP("____2",a5_brightLevel);  // wbp
@@ -2094,7 +2094,7 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
       if ((DisplayModeLocal < 20) && (DisplayModeLocal & 2) && (SecNow & 1)){ 
         // no HOUR:MINUTE separators
       }
-#endif				
+#endif
       else
         a5loadOSB_DP("01200",a5_brightLevel);  // non-flashing separator
 
@@ -2244,22 +2244,22 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
 #ifdef FEATURE_WmGPS
   else if (DisplayModeLocal == 41)  // Time Zone Hour
   {
-    unsigned int temp1 = abs(TZ_hour);  
+    unsigned int temp1 = abs(TZ_hour);
 
     if (TZ_hour < 0)
       WordIn[1] = '-';
     WordIn[2] =  U16DIVBY10(temp1) + a5_integerOffset;
-    WordIn[3] =  temp1%10 + a5_integerOffset; 
+    WordIn[3] =  temp1%10 + a5_integerOffset;
 
     if(forceUpdateCopy)
-    { 
-      a5clearOSB();  
-      a5loadOSB_Ascii(WordIn,a5_brightLevel);    
+    {
+      a5clearOSB();
+      a5loadOSB_Ascii(WordIn,a5_brightLevel);
       if (AlarmIndicate())
-        a5loadOSB_DP("20000",a5_brightLevel);     
+        a5loadOSB_DP("20000",a5_brightLevel);
       else
-        a5loadOSB_DP("00000",a5_brightLevel);     
-      a5BeginFadeToOSB(); 
+        a5loadOSB_DP("00000",a5_brightLevel);
+      a5BeginFadeToOSB();
     } 
 
   }
@@ -2268,18 +2268,18 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
   {
 
     WordIn[2] =  uint8_t(TZ_minutes/10) + a5_integerOffset;
-    WordIn[3] =  TZ_minutes%10 + a5_integerOffset; 
+    WordIn[3] =  TZ_minutes%10 + a5_integerOffset;
 
     if(forceUpdateCopy)
-    { 
-      a5clearOSB();  
-      a5loadOSB_Ascii(WordIn,a5_brightLevel);    
+    {
+      a5clearOSB();
+      a5loadOSB_Ascii(WordIn,a5_brightLevel);
       if (AlarmIndicate())
-        a5loadOSB_DP("20000",a5_brightLevel);     
+        a5loadOSB_DP("20000",a5_brightLevel);
       else
-        a5loadOSB_DP("00000",a5_brightLevel);     
-      a5BeginFadeToOSB(); 
-    } 
+        a5loadOSB_DP("00000",a5_brightLevel);
+      a5BeginFadeToOSB();
+    }
 
   }
 #endif
@@ -2405,7 +2405,7 @@ void EEReadSettings (void) {
     DST_mode = a5DSTModeDefault;
   else
     DST_mode = value;
-#endif		
+#endif
 
 #ifdef FEATURE_WmGPS
   value = EEPROM.read(10);
@@ -2416,15 +2416,15 @@ void EEReadSettings (void) {
 
   value = EEPROM.read(11);   // TZ_hour
   if ((value > 24) || (value<0))
-    TZ_hour = a5TZHourDefault;  
-  else  
-    TZ_hour = value-12;       
+    TZ_hour = a5TZHourDefault;
+  else
+    TZ_hour = value-12;
 
   value = EEPROM.read(12);   // TZ_minutes
   if ((value > 45) || (value < 0))
-    TZ_hour = a5TZMinutesDefault;  
-  else  
-    TZ_minutes = value;       
+    TZ_hour = a5TZMinutesDefault; 
+  else
+    TZ_minutes = value;
 #endif
 
 }
