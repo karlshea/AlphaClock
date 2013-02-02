@@ -23,6 +23,9 @@ extern byte GPS_mode;
 extern unsigned long tGPSupdate;
 extern byte GPSupdating;
 
+extern byte UseRTC;
+extern unsigned long tGPSupdateUT;
+
 // we double buffer: read into one line and leave one for the main program
 //volatile char gpsBuffer1[GPSBUFFERSIZE];
 //volatile char gpsBuffer2[GPSBUFFERSIZE];

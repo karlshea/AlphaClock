@@ -6,6 +6,7 @@
 
 #include "gps.h"
 #include "alphafive.h"
+#include <DS1307RTC.h>  // For optional RTC module. (This library included with the Arduino Time library)
 
 uint8_t GPS_mode = 0;  // 0, 48, 96
 #define gpsTimeoutLimit 5  // 5 seconds until we display the "no gps" message
@@ -185,11 +186,13 @@ void parseGPSdata(char *gpsBuffer) {
           tGPSupdateUT = tNow;  // remember time of this update (UT)
           tNow = tNow + (long)(TZ_hour + DST_offset) * SECS_PER_HOUR;  // add time zone hour offset & DST offset
           if (TZ_hour < 0)  // add or subtract time zone minute offset
-            tNow = tNow - (long)TZ_minutes * SECS_PER_HOUR;
+            tNow = tNow - (long)TZ_minutes * SECS_PER_MIN;  // 01feb13/wbp
           else
-            tNow = tNow + (long)TZ_minutes * SECS_PER_HOUR;
-//          rtc_set_time_t(tNow);  // set RTC from adjusted GPS time & date
+            tNow = tNow + (long)TZ_minutes * SECS_PER_MIN;  // 01feb13/wbp
           setTime(tNow);
+          if (UseRTC)  
+            RTC.set(now());  // set RTC from adjusted GPS time & date
+
           tGPSupdate = tNow;  // remember time of this update (local time)
           Serial.println("time set from GPS");
         }

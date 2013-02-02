@@ -3,7 +3,7 @@
 AlphaClock.ino 
 
 Firmware for the Alpha Clock Five by William B Phelps
-Version 2.1.0 - 30 January 2013
+Version 2.1.12 - 01 February 2013
 GPS and DST support Copyright 2013 (c) William B. Phelps - all commercial rights reserved
 
 FIXES:
@@ -14,6 +14,8 @@ FIXES:
 - entering menu mode cancels LED test mode
 - don't repeat on Menu & Test buttons
 - fix bug in menu display for 1 word items
+- set RTC from GPS when updating clock time
+- fix TZ_Minutes adjustment (oops!)
 
 CHANGES:
 - rewrite DisplayWord/DisplayWordSequence
@@ -22,6 +24,7 @@ CHANGES:
 
 - Automatic DST (currently for US only)
 - set time & date from GPS
+- turn "VCR mode" off when time set from GPS
 
 OPTIONAL:
 - Hold S1+S2 to enter menu, S3+S4 to enter test mode
@@ -104,6 +107,7 @@ Alpha_20.ino
 #ifdef FEATURE_AUTODST
 #include "adst.h"
 #endif
+void  EndVCRmode(void);
 #ifdef FEATURE_WmGPS
 #include "gps.h"  // wbp GPS support
 #endif
@@ -967,7 +971,6 @@ void DisplayWordDP (char WordIn[])
   dpCache[4] = WordIn[4];
 }
 
-
 void  EndVCRmode(){ 
   if (VCRmode){
     a5_brightLevel = MBlevel[Brightness];  
@@ -1226,6 +1229,8 @@ void loop() {
   {
     if (Serial1.available())  //wbp
       getGPSdata();  //wbp
+    if (GPSupdating)
+      EndVCRmode();  // stop flashing the time 
   }
 #endif
 
@@ -1794,6 +1799,8 @@ void UpdateDisplay (byte forceUpdate) {
         TZ_hour = 12;
       if (TZ_hour > 12)
         TZ_hour = -12;
+      if (optionValue != 0)
+        tGPSupdateUT = 0;  // update time at next GPRMC
       optionValue = 0;
       TimeDisplay(41, forceUpdate); // Show TZ hour
     }
@@ -1804,6 +1811,8 @@ void UpdateDisplay (byte forceUpdate) {
         TZ_minutes = 45;
       if (TZ_minutes > 45)
         TZ_minutes = 0;
+      if (optionValue != 0)
+        tGPSupdateUT = 0;  // update time at next GPRMC
       optionValue = 0;
       TimeDisplay(42, forceUpdate); // Show TZ minutes
     }
