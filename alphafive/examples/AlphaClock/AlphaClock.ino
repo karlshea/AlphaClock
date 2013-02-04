@@ -16,6 +16,7 @@ FIXES:
 - fix bug in menu display for 1 word items
 - set RTC from GPS when updating clock time
 - fix TZ_Minutes adjustment (oops!)
+- TZ Hour can go to +14, -12
 
 CHANGES:
 - rewrite DisplayWord/DisplayWordSequence
@@ -1798,8 +1799,8 @@ void UpdateDisplay (byte forceUpdate) {
     {
       TZ_hour += optionValue;
       if (TZ_hour < -12)
-        TZ_hour = 12;
-      if (TZ_hour > 12)
+        TZ_hour = 14;  // there are 14 positive time zones, not 12 (Kiribati)
+      if (TZ_hour > 14)
         TZ_hour = -12;
       if (optionValue != 0)
         tGPSupdateUT = 0;  // update time at next GPRMC
