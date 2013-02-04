@@ -27,7 +27,7 @@ CHANGES:
 - set time & date from GPS
 - turn "VCR mode" off when time set from GPS
 
-OPTIONAL (disabled, see comments on how to enable):
+OPTIONAL (ENABLED, see comments on how to disable):    *** WBP PERSONAL VERSION ***
 - Hold S1+S2 to enter menu, S3+S4 to enter test mode
 - Reverse +/- buttons
 
@@ -95,9 +95,9 @@ TODO:
 
 // NOTE: uncomment either of the following two "define" statements to enable the optional feature
 // Use S1+S2 for Menu, S3+S4 for test mode
-//#define MENU_S1S2
+#define MENU_S1S2
 // Flip the +/- buttons
-//#define REVERSE_PMBTNS
+#define REVERSE_PMBTNS
 
 #include <Time.h>       // The Arduino Time library, http://www.arduino.cc/playground/Code/Time
 #include <Wire.h>       // For optional RTC module
