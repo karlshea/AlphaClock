@@ -3,7 +3,7 @@
 AlphaClock.ino 
 
 Firmware for the Alpha Clock Five by William B Phelps
-Version 2.1.12 - 01 February 2013
+Version 2.1.13 - 04 February 2013
 GPS and DST support Copyright 2013 (c) William B. Phelps - all commercial rights reserved
 
 FIXES:
@@ -27,7 +27,7 @@ CHANGES:
 - set time & date from GPS
 - turn "VCR mode" off when time set from GPS
 
-OPTIONAL:
+OPTIONAL (disabled, see comments on how to enable):
 - Hold S1+S2 to enter menu, S3+S4 to enter test mode
 - Reverse +/- buttons
 
@@ -93,10 +93,11 @@ TODO:
 #define FEATURE_AUTODST
 #define FEATURE_WmGPS
 
+// NOTE: uncomment either of the following two "define" statements to enable the optional feature
 // Use S1+S2 for Menu, S3+S4 for test mode
-#define MENU_S1S2
+//#define MENU_S1S2
 // Flip the +/- buttons
-#define REVERSE_PMBTNS
+//#define REVERSE_PMBTNS
 
 #include <Time.h>       // The Arduino Time library, http://www.arduino.cc/playground/Code/Time
 #include <Wire.h>       // For optional RTC module
