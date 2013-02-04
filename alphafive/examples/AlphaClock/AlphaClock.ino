@@ -20,12 +20,12 @@ CHANGES:
 
  ------------------------------------------------------------
 
-Alpha_20.ino 
+ AlphaClock.ino 
  
- -- Alpha Clock Five Firmware, version 2.0 --
+ -- Alpha Clock Five Firmware, version 2.1 --
  
- Version 2.0.0 - 10/27/2012
- Copyright (c) 2012 Windell H. Oskay.  All right reserved.
+ Version 2.1.0 - January 31, 2013
+ Copyright (c) 2013 Windell H. Oskay.  All right reserved.
  http://www.evilmadscientist.com/
  
  ------------------------------------------------------------
@@ -35,7 +35,7 @@ Alpha_20.ino
  
  Target: ATmega644A, clock at 16 MHz.
  
- Designed to work with Arduino 1.0.1; untested with other versions.
+ Designed to work with Arduino 1.0.3; untested with other versions.
  
  For additional requrements, please see:
  http://wiki.evilmadscience.com/Alpha_Clock_Firmware_v2
@@ -44,9 +44,9 @@ Alpha_20.ino
  Thanks to Trammell Hudson for inspiration and helpful discussion.
  https://bitbucket.org/hudson/alphaclock
  
- ------------------------------------------------------------
  
- "No dogs were involved in the writing of this code."
+ Thanks to William Phelps - wm (at) usa.net, for several important 
+ bug fixes.    https://github.com/wbphelps/AlphaClock
  
  ------------------------------------------------------------
  
@@ -63,13 +63,13 @@ Alpha_20.ino
  
  You should have received a copy of the GNU General Public License
  along with this library.  If not, see <http://www.gnu.org/licenses/>.
- 
+  
  Note that the two word lists included with this distribution are NOT licensed under the GPL.
  - The list in fiveletterwords.h is derived from SCOWL, http://wordlist.sourceforge.net 
  Please see README-SCOWL.txt for copyright restrictions on the use and redistribution of this word list.
  - The alternative list in fiveletterwordspd.h is in the PUBLIC DOMAIN, 
  and cannot be restricted by the GPL or other copyright licenses.    
-
+ 	  
  */
 
 #include <Time.h>       // The Arduino Time library, http://www.arduino.cc/playground/Code/Time
@@ -164,7 +164,6 @@ byte RedrawNow, RedrawNow_NoFade;
 // Button Management:
 #define ButtonCheckInterval 20    // Time delay between responding to button state, ms
 #define HoldDownTime 2000         // How long to hold buttons to acces smenus requiring holding two buttons
-
 byte buttonStateLast;
 byte buttonMonitor;
 unsigned long Btn1_AlrmSet_StartTime, Btn2_TimeSet_StartTime, Btn3_Plus_StartTime, Btn4_Minus_StartTime;
@@ -227,16 +226,18 @@ void decrementAlarm(void)
   UpdateEE = 1;
 }
 
-
 void TurnOffAlarm(void)
-{ // This stops the alarm when it is going off. It does not disable the alarm.
-  if ( (alarmNow || alarmSnoozed) && (modeShowMenu == 0) )
-    DisplayWords("ALARM", "END  ", 800); // Display: "ALARM OFF", EXCEPT if we are in the menus.
-  alarmSnoozed = 0;
-  alarmNow = 0;
-  a5noTone();
-}
+{ // This cancels the alarm when it is going off (or alarmSnoozed).
+  // It does leave the alarm enabled for next time, however.
+  if (alarmNow || alarmSnoozed){
+    alarmSnoozed = 0;
+    alarmNow = 0;
+    a5noTone();
 
+    if (modeShowMenu == 0) 
+			DisplayWords("ALARM", "STOP ", 800); // Display: "ALARM OFF", EXCEPT if we are in the menus.
+  }
+}  
 
 void checkButtons(void )
 { 
@@ -281,7 +282,7 @@ void checkButtons(void )
 
             AlarmTimeSnoozeMin = minute(tNow) + 9;
             AlarmTimeSnoozeHr = hour(tNow);
-            
+
             if  ( AlarmTimeSnoozeMin > 59){
               AlarmTimeSnoozeMin -= 60;
               AlarmTimeSnoozeHr += 1;
@@ -314,7 +315,6 @@ void checkButtons(void )
     if (modeShowMenu || buttonMonitor)
       LastButtonPress = milliTemp;  //Reset EEPROM Save Timer if menu shown, or if a button pressed.
 
-
     /////////////////////////////  ENTERING & LEAVING CONFIG MENU  /////////////////////////////  
     // Check to see if both S3 and S4 are both currently pressed or held down:
     if (( buttonMonitor & a5_plusBtn) && ( buttonMonitor & a5_minusBtn) && holdDebounce)
@@ -340,7 +340,6 @@ void checkButtons(void )
         }
       }
     }
-
 
     if (modeShowMenu && holdDebounce){    // Button behavior, when in Config menu mode:
 
@@ -478,9 +477,7 @@ void checkButtons(void )
         }
 
 
-
       /////////////////////////////  ENTERING & LEAVING LED TEST MODE  /////////////////////////////  
-
       // Check to see if both S1 and S2 are both currently depressed or held down:
       if (( buttonMonitor & a5_alarmSetBtn) && ( buttonMonitor & a5_timeSetBtn) && holdDebounce)
       {
@@ -531,6 +528,7 @@ void checkButtons(void )
         } 
       }
 
+
       // If TimeSet button was just released::
       if (( (buttonMonitor & a5_timeSetBtn) == 0) && (buttonStateLast & a5_timeSetBtn))
       {
@@ -558,6 +556,7 @@ void checkButtons(void )
 
       }
 
+
       if (( (buttonMonitor & a5_plusBtn) == 0) && (buttonStateLast & a5_plusBtn))
       { // The "+" button has just been released.
         if (holdDebounce)
@@ -566,6 +565,7 @@ void checkButtons(void )
             TimeChanged = 1;  // Acknowledge that the button has been released, for purposes of time editing. 
           if (AlarmTimeChanged > 0)
             AlarmTimeChanged = 1;  // Acknowledge that the button has been released, for purposes of time editing. 
+
           // IF no other buttons are down, increase brightness:
           if (((buttonMonitor & a5_allButtonsButPlus) == 0) && (AlarmTimeChanged + TimeChanged == 0))
             if (Brightness < BrightnessMax)
@@ -604,10 +604,10 @@ void checkButtons(void )
 
 
 void DisplayMenuOptionName(void){
+  // Display title of menu name after switching to new menu utem.
   // Turn off word sequence if running
   wordCount = 0;
   wordSequenceStep = 0;
-  // Display title of menu name after switching to new menu utem.
   switch (menuItem) {
   case NightLightMenuItem:
     DisplayWords("NIGHT", "LIGHT", 600);  // Night Light
@@ -829,9 +829,10 @@ void DisplayWord (char WordIn[], unsigned int duration)
 
 void DisplayWordDP (char WordIn[])
 {
-  // Usage: DisplayWordDP("_123_"); 
+  // Usage: DisplayWord("_123_"); 
   // Add or edit decimals for text displayed via DisplayWord().
   // Call in conjuction with DisplayWord, just before or after.
+
   dpCache[0] = WordIn[0];
   dpCache[1] = WordIn[1];
   dpCache[2] = WordIn[2];
@@ -884,8 +885,8 @@ void setup() {
 
   if ( UseRTC == 0)
   {
-    Serial.println("Setting the date to 2012. I didn't exist in 1970.");   
-    setTime(0,0,0,1, 1, 2012);
+    Serial.println("Setting the date to 2013. I didn't exist in 1970.");   
+    setTime(0,0,0,1, 1, 2013);
   }
 
   SerialPrintTime(); 
@@ -937,6 +938,7 @@ void setup() {
     wordSequenceStep = 0;
     DisplayWord("*****", 1000); 
   }
+
 
   a5_brightLevel = MBlevel[Brightness];
   a5_brightMode = MBmode[Brightness]; 
@@ -1069,7 +1071,9 @@ void loop() {
     processSerialMessage();
   } 
 
+
 }
+
 
 
 #define a5_COMM_MSG_LEN  13   // time sync to PC is HEADER followed by unix time_t as ten ascii digits  (Was 11)
@@ -1314,12 +1318,9 @@ void UpdateDisplay (byte forceUpdate) {
     if ((milliTemp >= DisplayWordEndTime) && (modeShowText == 1))
     {
       modeShowText = 0;
-
-
       if (wordCount)
         DisplayWordSequence();  
       // If the word sequence is finished, return to clock display:
-
       if (wordCount == 0) 
         RedrawNow = 1; 
     } 
@@ -1612,7 +1613,7 @@ void UpdateDisplay (byte forceUpdate) {
     if ((DisplayMode > 3) && (DisplayMode < 32))
     {
 
-		if (buttonMonitor) 
+     if (buttonMonitor) 
       {
         // Do not use alternate display modes when buttons are pressed.
         DisplayModePhase = 0;
@@ -1631,7 +1632,6 @@ void UpdateDisplay (byte forceUpdate) {
           forceUpdate = 1;
 
           DisplayWord("     ", 400);  // Blank out between display phases 
-
           if (AlarmEnabled)  
             DisplayWordDP("2____");
           else
@@ -1658,31 +1658,49 @@ void UpdateDisplay (byte forceUpdate) {
 
   }
 }
-
+ 
 
 void AdjDayMonthYear (int8_t AdjDay, int8_t AdjMonth, int8_t AdjYear)
 {
-  tNow = now();  // wbp
-  int yrTmp = year(tNow) + (int) AdjYear;  //wbp
-  int moTmp = month(tNow) + AdjMonth;
-  if (moTmp < 1)
-    moTmp = 12;
-  else if (moTmp > 12)
-    moTmp = 1;
-  int daTmp = day(tNow) + AdjDay;
-  if (daTmp < 1)
-    daTmp = 31;
-  else if (daTmp > 31)
-    daTmp = 1;
-  setTime(hour(tNow),minute(tNow),second(tNow),daTmp,moTmp,yrTmp);  //wbp
+  // From Time library: API starts months from 1, this array starts from 0
+  const uint8_t monthDays[]={31,29,31,30,31,30,31,31,30,31,30,31};  // february can have 29 days
+
+   time_t timeTemp = now();
+      
+  int yrTemp = year(timeTemp) + (int) AdjYear;  
+  
+  int moTemp = month(timeTemp) + AdjMonth;  // Avoid changing year, unless requested
+  if (moTemp < 1)
+      moTemp = 12;
+   if (moTemp > 12)
+      moTemp = 1;
+      
+  int dayTemp = day(timeTemp) + AdjDay;  // avoid changing month, unless requested
+  
+  if (dayTemp < 1)
+     dayTemp = monthDays[moTemp - 1]; 
+     
+  if (dayTemp > monthDays[moTemp - 1])
+    if (AdjDay > 0)
+      {  // Roll over day-of-month to 1, if explicitly requesting increase in date.  
+         dayTemp = 1;
+      }
+      else
+      { // Otherwise, we should "truncate" the date to last day of month.
+       dayTemp = monthDays[moTemp - 1];
+      }
+     
+  setTime(hour(timeTemp),minute(timeTemp),second(timeTemp),
+      dayTemp, moTemp, yrTemp);
   if (UseRTC)  
     RTC.set(now()); 
 }
 
 
+
+
 void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
   byte temp;
-
   char units;
   char WordIn[] = {
     "     "                                                                                                                                      };
@@ -1834,10 +1852,9 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
       if (AlarmEnabled)
         a5loadOSB_DP("2____",a5_brightLevel);     
 
-			if ((DisplayModeLocal < 20) && (DisplayModeLocal & 2) && (SecNow & 1)) { 
+      if ((DisplayModeLocal < 20) && (DisplayModeLocal & 2) && (SecNow & 1)){ 
         // no HOUR:MINUTE separators
       }
-
       else
         a5loadOSB_DP("01200",a5_brightLevel);    
 
@@ -1845,6 +1862,7 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
     }  
 
     MinNowOnesLast = MinNowOnes;  
+
   }
 
   else if (DisplayModeLocal == 32)  //Seconds only
@@ -1861,7 +1879,6 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
     { 
       a5clearOSB();  
       a5loadOSB_Ascii(WordIn,a5_brightLevel);    
-
 
       if (AlarmEnabled)
         a5loadOSB_DP("21200",a5_brightLevel);     
@@ -1895,7 +1912,6 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
       a5clearOSB();  
       a5loadOSB_Ascii(WordIn,a5_brightLevel);    
 
-
       if (AlarmEnabled)
         a5loadOSB_DP("20100",a5_brightLevel);     
       else
@@ -1923,7 +1939,6 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
     { 
       a5clearOSB();  
       a5loadOSB_Ascii(WordIn,a5_brightLevel);    
-
 
       if (AlarmEnabled)
         a5loadOSB_DP("20000",a5_brightLevel);     
@@ -1979,31 +1994,32 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
       else
         a5loadOSB_DP("00000",a5_brightLevel);     
 
-
       a5BeginFadeToOSB(); 
     }   
   }
 
   DisplayModeLocalLast = DisplayModeLocal;
   SecLast = SecNow; 
+
 }
 
 
 void SerialPrintTime(){
   //   Print time over serial interface.   Adapted from Time library.
-  tNow = now();  // wbp
 
-  Serial.print(hour(tNow));
-  printDigits(minute(tNow));
-  printDigits(second(tNow));
+	time_t timeTmp = now();  
+
+  Serial.print(hour(timeTmp));
+  printDigits(minute(timeTmp));
+  printDigits(second(timeTmp));
   Serial.print(" ");
-  Serial.print(dayStr(weekday(tNow)));
+  Serial.print(dayStr(weekday(timeTmp)));
   Serial.print(" ");
-  Serial.print(day(tNow));
+  Serial.print(day(timeTmp));
   Serial.print(" ");
-  Serial.print(monthShortStr(month(tNow)));
+  Serial.print(monthShortStr(month(timeTmp)));
   Serial.print(" ");
-  Serial.print(year(tNow)); 
+  Serial.print(year(timeTmp)); 
   Serial.println(); 
 
 }
@@ -2029,8 +2045,8 @@ void ApplyDefaults (void) {
   AlarmTone =       a5AlarmToneDefault;
   NightLightType =  a5NightLightTypeDefault;  
   numberCharSet =   a5NumberCharSetDefault;
-
 }
+
 
 
 void EEReadSettings (void) {  
@@ -2100,8 +2116,6 @@ void EEReadSettings (void) {
 }
 
 
-
-
 void EESaveSettings (void){ 
 
   // If > 4 seconds since last button press, and
@@ -2164,9 +2178,8 @@ void EESaveSettings (void){
       indicateEEPROMwritten = 1;
     }      
 
-
     if (indicateEEPROMwritten) { // Blink LEDs off to indicate when we're writing to the EEPROM 
-      DisplayWord("SAVED", 200);  
+      DisplayWord ("SAVED", 500);  
     }
 
     UpdateEE = 0;
@@ -2174,4 +2187,6 @@ void EESaveSettings (void){
       RTC.set(now());  // Update time at RTC, in case time was changed in settings menu
   }
 } 
+
+
 
