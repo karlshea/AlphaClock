@@ -30,9 +30,12 @@ CHANGES:
 OPTIONAL (ENABLED, see comments on how to disable):    *** WBP PERSONAL VERSION ***
 - Hold S1+S2 to enter menu, S3+S4 to enter test mode
 - Reverse +/- buttons
+- Automatic Dim/Bright at preset times
 
 TODO:
 - add DST configuration to menu
+- countdown timer
+- piezo mods?
 
  ------------------------------------------------------------
 
@@ -92,6 +95,7 @@ TODO:
 // Note - GPS support has not been tested without AUTODST enabled
 #define FEATURE_AUTODST
 #define FEATURE_WmGPS
+#define FEATURE_AUTODIM
 
 // NOTE: uncomment either of the following two "define" statements to enable the optional feature
 // Use S1+S2 for Menu, S3+S4 for test mode
@@ -136,6 +140,13 @@ void  EndVCRmode(void);
 #define a5TZHourDefault -8  // default Pacific Time zone
 #define a5TZMinutesDefault 0  // default Pacific Time zone
 #endif
+#ifdef FEATURE_AUTODIM
+#define a5AutoDimEnabledDefault 0
+#define a5AutoDimHour1Default 7
+#define a5AutoDimBright1Default 11
+#define a5AutoDimHour2Default 22
+#define a5AutoDimBright2Default 5
+#endif
 
 // Clock mode variables
 
@@ -163,7 +174,7 @@ int8_t optionValue;
 #define SetMonthMenuItem 7
 #define SetDayMenuItem 8
 #define SetSecondsMenuItem 9 
-#define AltModeMenuItem 10 
+#define AltModeMenuItem 10
 #define MenuItemsMax 10
 
 #ifdef FEATURE_AUTODST
@@ -175,6 +186,14 @@ int8_t optionValue;
 #define TZHoursMenuItem 13
 #define TZMinutesMenuItem 14
 #define MenuItemsMax 14
+#endif
+#ifdef FEATURE_AUTODIM
+#define AutoDimMenuItem 15
+#define AutoDimMenuHour1 16
+#define AutoDimMenuBright1 17
+#define AutoDimMenuHour2 18
+#define AutoDimMenuBright2 19
+#define MenuItemsMax 19
 #endif
 
 // Clock display mode:
@@ -248,7 +267,15 @@ byte alarmPrimed;
 byte alarmNow;
 
 byte modeShowAlarmTime;
-byte SoundSequence; 
+byte SoundSequence;
+
+#ifdef FEATURE_AUTODIM
+byte AutoDimEnabled = false;
+byte AutoDimHour1 = 7;
+byte AutoDimBright1 = 11;
+byte AutoDimHour2 = 22;
+byte AutoDimBright2 = 5;
+#endif
 
 void incrementAlarm(void)
 {  // Advance alarm time by one minute 
@@ -318,7 +345,7 @@ void checkButtons(void )
       if (( buttonMonitor & a5_alarmSetBtn) && ((buttonStateLast & a5_alarmSetBtn) == 0))
       {  // If Alarm Set button was just depressed
 
-        Btn1_AlrmSet_StartTime = milliTemp;  
+        Btn1_AlrmSet_StartTime = milliTemp;
 
         if (alarmNow){  // If alarm is going off, this button is the SNOOZE button.
 
@@ -332,7 +359,7 @@ void checkButtons(void )
             alarmSnoozed = 1; 
 
             a5editFontChar ('a', 54, 1, 37);    // Define special character
-            DisplayWord("SNaZE", 1500);  
+            DisplayWord("SNaZE", 1500);
 
             AlarmTimeSnoozeMin = minute(tNow) + 9;
             AlarmTimeSnoozeHr = hour(tNow);
@@ -356,14 +383,14 @@ void checkButtons(void )
       if (( buttonMonitor & a5_plusBtn) && ((buttonStateLast & a5_plusBtn) == 0))
         Btn3_Plus_StartTime = milliTemp; 
       if (( buttonMonitor & a5_minusBtn) && ((buttonStateLast & a5_minusBtn) == 0)) 
-        Btn4_Minus_StartTime = milliTemp;  
+        Btn4_Minus_StartTime = milliTemp;
     }
     else if ((buttonStateLast == 0 ) && ( buttonMonitor == 0))
     {
       // Reset some variables if all buttons are up, and have not just been released:
       TimeChanged = 0;
       AlarmTimeChanged = 0;
-      holdDebounce = 1;  
+      holdDebounce = 1;
     }
 
     if (modeShowMenu || buttonMonitor)
@@ -453,7 +480,7 @@ void checkButtons(void )
           TurnOffAlarm();
         } 
         else {  // If we are in a configuration menu
-          menuItem++;          
+          menuItem++;
           if ( menuItem > MenuItemsMax)   //Decrement current position within options menu
             menuItem = 0;  // Wrap-around at high-end of menu
           optionValue = 0;
@@ -486,17 +513,17 @@ void checkButtons(void )
         if (TimeChanged < 2)
         {        
           adjustTime(60); // Add one minute   
-          RedrawNow = 1; 
+          RedrawNow = 1;
           TimeChanged = 2;  // One-time press: detected
-          if (UseRTC)  
-            RTC.set(now()); 
+          if (UseRTC)
+            RTC.set(now());
         }    
         else if ( milliTemp >= (Btn3_Plus_StartTime + 400))
         {
           adjustTime(60); // Add one minute 
           RedrawNow_NoFade = 1; 
           if (UseRTC)  
-            RTC.set(now());      
+            RTC.set(now());
         }
 
       // Check to see if both time-set button and minus button are both currently depressed:
@@ -513,9 +540,9 @@ void checkButtons(void )
         {
           adjustTime(-60); // Subtract one minute 
           RedrawNow_NoFade = 1; 
-          //          TimeChanged = 1;    
+          //          TimeChanged = 1;
           if (UseRTC)  
-            RTC.set(now());      
+            RTC.set(now());
         }
 
       /////////////////////////////  Time-Of-Alarm Adjustments  /////////////////////////////  
@@ -548,7 +575,7 @@ void checkButtons(void )
         {
           incrementAlarm(); // Add one minute
           RedrawNow_NoFade = 1; 
-          //          TimeChanged = 1;         
+          //          TimeChanged = 1;
         }      
 
       // Check to see if both alarm-set button and minus button are both currently depressed:
@@ -564,7 +591,7 @@ void checkButtons(void )
         {
           decrementAlarm(); // Subtract one minute
           RedrawNow_NoFade = 1; 
-          //          TimeChanged = 1;         
+          //          TimeChanged = 1;
         }
 
       /////////////////////////////  ENTERING & LEAVING LED TEST MODE  /////////////////////////////  
@@ -602,7 +629,7 @@ void checkButtons(void )
         if( (milliTemp >= (Btn1_AlrmSet_StartTime + TestHoldDownTime )) && (milliTemp >= (Btn2_TimeSet_StartTime + TestHoldDownTime )))
         {
           Btn1_AlrmSet_StartTime = milliTemp;  // Reset hold-down timer
-          Btn2_TimeSet_StartTime = milliTemp;   // Reset hold-down timer
+          Btn2_TimeSet_StartTime = milliTemp;  // Reset hold-down timer
           holdDebounce = 0;
           if (modeLEDTest) // If we are currently in the LED Test mode,
           {
@@ -744,23 +771,23 @@ void DisplayMenuOptionName(void){
     DisplayWords("CLOCK", "STYLE", 600); // Clock Style
     break;
   case SetYearMenuItem:
-    DisplayWord("YEAR ", 800); 
+    DisplayWord("YEAR ", 800);
     DisplayWordDP("___12");
     break;
   case SetMonthMenuItem:
-    DisplayWord("MONTH", 800);   
-    break;      
+    DisplayWord("MONTH", 800);
+    break;
   case SetDayMenuItem:
-    DisplayWord("DAY  ", 800);  
+    DisplayWord("DAY  ", 800);
     DisplayWordDP("__12_");
-    break;       
+    break;
   case SetSecondsMenuItem:
-    DisplayWord("SECS ", 800);  
+    DisplayWord("SECS ", 800);
     DisplayWordDP("___12");
-    break;   
-  case AltModeMenuItem:  
+    break;
+  case AltModeMenuItem:
     DisplayWords("TIME ", "AND..", 900);
-    //    DisplayWord("ALTW/", 2000);  
+    //    DisplayWord("ALTW/", 2000);
     //   DisplayWordDP("__11_");
     break;
 #ifdef FEATURE_AUTODST
@@ -777,6 +804,23 @@ void DisplayMenuOptionName(void){
     break;
   case TZMinutesMenuItem:
     DisplayWords("TIME ", "ZONE ", "MIN  ", 600);  // Time Zone Min
+    break;
+#endif
+#ifdef FEATURE_AUTODIM
+  case AutoDimMenuItem:
+    DisplayWord("ADIM ", 800);
+    break;
+  case AutoDimMenuHour1:
+    DisplayWord("A1HR ", 800);
+    break;
+  case AutoDimMenuBright1:
+    DisplayWord("A1BRT", 800);
+    break;
+  case AutoDimMenuHour2:
+    DisplayWord("A2HR ", 800);
+    break;
+  case AutoDimMenuBright2:
+    DisplayWord("A2BRT", 800);
     break;
 #endif
   default:  // do nothing!
@@ -798,10 +842,10 @@ void ManageAlarm (void) {
       if (SoundSequence < 8)
       {
         if (SoundSequence & 1) 
-          a5tone( 50, 300);  
+          a5tone( 50, 300);
         else 
-          a5tone(0, 300);  
-        SoundSequence++;    
+          a5tone(0, 300);
+        SoundSequence++;
       }
       else
       { 
@@ -814,10 +858,10 @@ void ManageAlarm (void) {
       if (SoundSequence < 8)
       {
         if (SoundSequence & 1) 
-          a5tone( 100, 200);  
+          a5tone( 100, 200);
         else 
-          a5tone(0, 200);  
-        SoundSequence++;    
+          a5tone(0, 200);
+        SoundSequence++;
       }
       else
       { 
@@ -833,7 +877,7 @@ void ManageAlarm (void) {
           a5tone( 1000, 200); 
         else 
           a5tone( 0, 200); 
-        SoundSequence++;   
+        SoundSequence++;
       }
       else
       { 
@@ -849,12 +893,12 @@ void ManageAlarm (void) {
           a5tone( 2050, 300); 
         else 
           a5tone( 0, 200); 
-        SoundSequence++;   
+        SoundSequence++;
       }
       else
       { 
         a5tone(0, 1000);
-        SoundSequence = 0;  
+        SoundSequence = 0;
       }
     }
     else if (AlarmTone == 4)   // Siren Tone
@@ -862,7 +906,7 @@ void ManageAlarm (void) {
       if (SoundSequence < 254)
       { 
         a5tone(20 + 4 * SoundSequence, 2); 
-        SoundSequence++; 
+        SoundSequence++;
       }
       else if (SoundSequence == 254)
       { 
@@ -889,7 +933,7 @@ void ManageAlarm (void) {
       else
       { 
         a5tone(0, 50);
-        SoundSequence = 0;  
+        SoundSequence = 0;
       }
     } 
   }
@@ -977,7 +1021,7 @@ void DisplayWordDP (char WordIn[])
 
 void  EndVCRmode(){ 
   if (VCRmode){
-    a5_brightLevel = MBlevel[Brightness];  
+    a5_brightLevel = MBlevel[Brightness];
     RedrawNow_NoFade = 1;
     VCRmode = 0;
 
@@ -1000,7 +1044,7 @@ void setup() {
   VCRmode = 1;
 
   Serial.println("\nHello, World.");
-  Serial.println("Alpha Clock Five here, reporting for duty!");   
+  Serial.println("Alpha Clock Five here, reporting for duty!"); 
 
 #ifdef FEATURE_WmGPS
   Serial1.end();  // close serial1 opened by a5Init
@@ -1023,16 +1067,16 @@ void setup() {
       UseRTC = 0;
     }
     else {
-      Serial.println("System time: Set by RTC.  Rock on!");  
+      Serial.println("System time: Set by RTC.  Rock on!");
       EndVCRmode();
     }
   }
   else
-    Serial.println("RTC not detected. I don't know what time it is.  :(");  
+    Serial.println("RTC not detected. I don't know what time it is.  :(");
 
   if ( UseRTC == 0)
   {
-    Serial.println("Setting the date to 2013. I didn't exist in 1970.");   
+    Serial.println("Setting the date to 2013. I didn't exist in 1970."); 
     setTime(0,0,0,1, 1, 2013);
   }
 
@@ -1044,7 +1088,7 @@ void setup() {
   SerialPrintTime(); 
   NextClockUpdate = millis() + 1;
 
-  buttonMonitor = 0;  
+  buttonMonitor = 0;
   holdDebounce = 0;
 
   modeShowAlarmTime = 0;
@@ -1072,7 +1116,7 @@ void setup() {
   RedrawNow_NoFade = 0;
   UpdateBrightness = 0;
 
-  DisplayWords("ALPHA", "CLOCK", "  5  ", "     ", 750);  // Display: Hello world
+  DisplayWords("ALPHA", "CLOCK", " 5 WM", "     ", 750);  // Display: Hello world
 
   buttonMonitor = a5GetButtons(); 
   if (( buttonMonitor & a5_alarmSetBtn) && ( buttonMonitor & a5_timeSetBtn))
@@ -1084,9 +1128,9 @@ void setup() {
     AlarmTimeHr = a5AlarmHrDefault; 
     AlarmTimeMin = a5AlarmMinDefault; 
     AlarmTone = a5AlarmToneDefault; 
-    NightLightType = a5NightLightTypeDefault;   
+    NightLightType = a5NightLightTypeDefault; 
     numberCharSet = a5NumberCharSetDefault; 
-    DisplayMode = a5DisplayModeDefault;       
+    DisplayMode = a5DisplayModeDefault;
 #ifdef FEATURE_AUTODST
     DST_mode = a5DSTModeDefault;
 #endif
@@ -1099,7 +1143,7 @@ void setup() {
 
 
   a5_brightLevel = MBlevel[Brightness];
-  a5_brightMode = MBmode[Brightness]; 
+  a5_brightMode = MBmode[Brightness];
 
   a5loadAltNumbers(numberCharSet);
 
@@ -1117,6 +1161,9 @@ void setup() {
 void loop() {
 
   tNow = now();  // fetch time & date (wbp)
+  byte tHour = hour(tNow);
+  byte tMinute = minute(tNow);
+  byte tSecond = second(tNow);
   milliTemp = millis();
   checkButtons();
 
@@ -1126,8 +1173,8 @@ void loop() {
 
     if (a5_brightMode == MBmode[Brightness])
     {
-      a5_brightLevel = MBlevel[Brightness];          
-      UpdateDisplay (1); // Force update of display data, with new brightness level 
+      a5_brightLevel = MBlevel[Brightness];
+      UpdateDisplay (1); // Force update of display data, with new brightness level
     }
     else
     {
@@ -1135,9 +1182,9 @@ void loop() {
       UpdateDisplay (1); // Force update of display data, with temporary brightness level
       a5loadVidBuf_fromOSB();
 
-      a5_brightLevel = MBlevel[Brightness];          
-      UpdateDisplay (1); // Force update of display data, with new brightness level  
-      a5_brightMode = MBmode[Brightness];  
+      a5_brightLevel = MBlevel[Brightness];
+      UpdateDisplay (1); // Force update of display data, with new brightness level
+      a5_brightMode = MBmode[Brightness];
     } 
   }
 
@@ -1147,13 +1194,13 @@ void loop() {
       byte temp = second(tNow) & 1; 
       if((temp) && (VCRmode == 1))
       {
-        a5_brightLevel = 0;  
+        a5_brightLevel = 0;
         RedrawNow_NoFade = 1;
         VCRmode = 2;
       }
       if((temp == 0) && (VCRmode == 2))
       {
-        a5_brightLevel = MBlevel[Brightness];  
+        a5_brightLevel = MBlevel[Brightness];
         RedrawNow_NoFade = 1;
         VCRmode = 1;
       }
@@ -1188,16 +1235,14 @@ void loop() {
       EESaveSettings();
   }
 
-  // Check for alarm:
+  // Check for alarm (and auto dimming):
   if  (milliTemp >= NextAlarmCheck)
   {
     NextAlarmCheck = milliTemp +  500;  // Check again in 1/2 second. 
 
     if (AlarmEnabled)  {
-      byte hourTemp = hour(tNow);
-      byte minTemp = minute(tNow);
 
-      if ((AlarmTimeHr == hourTemp ) && (AlarmTimeMin == minTemp ))
+      if ((AlarmTimeHr == tHour ) && (AlarmTimeMin == tMinute ))
       {
         if (alarmPrimed){ 
           alarmPrimed = 0;
@@ -1207,19 +1252,35 @@ void loop() {
         }
       }
       else{
-        alarmPrimed = 1;  
+        alarmPrimed = 1;
         // Prevent alarm from going off twice in the same minute, after being turned off and back on.
       }
 
       if (alarmSnoozed)
-        if  ((AlarmTimeSnoozeHr == hourTemp ) && (AlarmTimeSnoozeMin == minTemp ))
+        if  ((AlarmTimeSnoozeHr == tHour ) && (AlarmTimeSnoozeMin == tMinute ))
         {
           alarmNow = 1;
           alarmSnoozed = 0; 
           SoundSequence = 0; 
         }
     }
+    
+#ifdef FEATURE_AUTODIM
+    if ( AutoDimEnabled && (tSecond == 0) && (tMinute == 0) )
+      {
+        if (AutoDimHour1 == tHour)
+        {
+          Brightness = AutoDimBright1;
+          UpdateBrightness = 1;
+        }
+        else if (AutoDimHour2 == tHour)
+        {
+          Brightness = AutoDimBright2;
+          UpdateBrightness = 1;
+        }
+      }
   }
+#endif
 
   if (alarmNow)
     ManageAlarm();
@@ -1253,12 +1314,12 @@ void SerialSendDataDaisyChain (char DataIn[])
   char *fromPtr = &DataIn[0]; 
 
   *toPtr++ = 255;
-  *toPtr++ = *fromPtr++;  
+  *toPtr++ = *fromPtr++;
   *toPtr++ = *fromPtr++;
   *toPtr++ = *fromPtr++;
   *toPtr++ = *fromPtr++;
 
-  *toPtr++ = *fromPtr++;  
+  *toPtr++ = *fromPtr++;
   *toPtr++ = *fromPtr++;
   *toPtr++ = *fromPtr++;
   *toPtr++ = *fromPtr++;
@@ -1293,7 +1354,7 @@ void processSerialMessage() {
         {  // COMMAND: ST, SET TIME     
           time_t pctime = 0;
           for( i=0; i < 10; i++){   
-            c = Serial.read();          
+            c = Serial.read();
             if( c >= '0' && c <= '9'){   
               pctime = (10 * pctime) + (c - '0') ; // convert digits to a number    
             }
@@ -1327,7 +1388,7 @@ void processSerialMessage() {
             i += 10 * (Serial.read() - '0');
             i += (Serial.read() - '0');
 
-            temp = (Serial.read() - '0');          
+            temp = (Serial.read() - '0');
 
             temp2 = 100 * (Serial.read() - '0');
             temp2 += 10 * (Serial.read() - '0');
@@ -1357,7 +1418,7 @@ void processSerialMessage() {
             }   
           }
 
-          RedrawNow = 1;  
+          RedrawNow = 1;
           EndVCRmode();
         }
         else { // Daisy chaining: With Bx, where x is less than 48 or x is less than 10:
@@ -1368,9 +1429,9 @@ void processSerialMessage() {
             OutputCache[1] = c2 - 1;
 
             for( i=2; i < 12; i++){   
-              OutputCache[i] = Serial.read();  
+              OutputCache[i] = Serial.read();
             }   
-            SerialSendDataDaisyChain (OutputCache);            
+            SerialSendDataDaisyChain (OutputCache);
           }
 
         }
@@ -1381,15 +1442,15 @@ void processSerialMessage() {
         { // COMMAND: A0, DISPLAY ASCII DATA  
           // ASCII display mode, first 5 chars will be displayed, second 5: decimals
 
-          for( i=0; i < 10; i++){   
-            c = Serial.read();     
-            if (i < 5) 
-              wordCache[i] = c; 
-            else 
-              dpCache[i - 5] = c;  
-          }             
-          modeShowText = 3;   
-          RedrawNow = 1; 
+          for( i=0; i < 10; i++){
+            c = Serial.read();
+            if (i < 5)
+              wordCache[i] = c;
+            else
+              dpCache[i - 5] = c;
+          }
+          modeShowText = 3;
+          RedrawNow = 1;
           EndVCRmode();
         }
         else { // Daisy chaining: With Ax, where x is less than 48 or x is less than 10:
@@ -1400,9 +1461,9 @@ void processSerialMessage() {
             OutputCache[1] = c2 - 1;
 
             for( i=2; i < 12; i++){   
-              OutputCache[i] = Serial.read();  
+              OutputCache[i] = Serial.read();
             }   
-            SerialSendDataDaisyChain (OutputCache);            
+            SerialSendDataDaisyChain (OutputCache);          
           }
         }
       }
@@ -1432,13 +1493,13 @@ void updateNightLight(void)
   { // "Sleep" mode
     unsigned int temp = 0; 
 
-    NightLightStep++;  
+    NightLightStep++;
 
     if (NightLightStep <= 255) { 
       if (NightLightSign) 
         temp = NightLightStep; 
       else 
-        temp = 255 - NightLightStep;    
+        temp = 255 - NightLightStep;  
     }
     else 
     { 
@@ -1495,10 +1556,10 @@ void UpdateDisplay (byte forceUpdate) {
     {
       if(forceUpdate)
       { 
-        a5clearOSB();    
+        a5clearOSB();  
         a5loadOSB_Ascii(wordCache,a5_brightLevel);
         a5loadOSB_DP(dpCache,a5_brightLevel);
-        a5BeginFadeToOSB();   
+        a5BeginFadeToOSB(); 
       }
     }
   }
@@ -1527,11 +1588,11 @@ void UpdateDisplay (byte forceUpdate) {
 
       byte map[] = {
         7,0,1,10,11,3,2,12,13,14,15,16,5,17,8,9,4,6
-      };  
+      };
 
-      a5clearOSB();   
+      a5clearOSB(); 
       a5_OSB[18 * temp + map[remainder]] = a5_brightLevel; 
-      a5BeginFadeToOSB();  
+      a5BeginFadeToOSB();
       RedrawNow = 1;
     }  
 
@@ -1557,7 +1618,7 @@ void UpdateDisplay (byte forceUpdate) {
       if (HourMode24) 
         DisplayWord("24 HR", 500);
       else
-        DisplayWord("AM/PM", 500);  
+        DisplayWord("AM/PM", 500);
 
       ExtendTextDisplay = 1;
     }
@@ -1574,7 +1635,7 @@ void UpdateDisplay (byte forceUpdate) {
         if (NightLightType == 4) 
         {
           NightLightStep = 0;
-          NightLightSign = 1;  
+          NightLightSign = 1;
         }
         updateNightLight();
       }
@@ -1583,13 +1644,13 @@ void UpdateDisplay (byte forceUpdate) {
       if (NightLightType == 0) 
         DisplayWord(" NONE", 500);
       else if (NightLightType == 1) 
-        DisplayWord(" LOW ", 500);  
+        DisplayWord(" LOW ", 500);
       else if (NightLightType == 2) 
-        DisplayWord(" MED ", 500);  
+        DisplayWord(" MED ", 500);
       else if (NightLightType == 3) 
-        DisplayWord(" HIGH", 500);  
+        DisplayWord(" HIGH", 500);
       else  // (NightLightType == 4) 
-      DisplayWord("SLEEP", 500);  
+      DisplayWord("SLEEP", 500);
       ExtendTextDisplay = 1;
     }    
     else if (menuItem == AlarmToneMenuItem)  // Alarm Tone: 2
@@ -1604,20 +1665,20 @@ void UpdateDisplay (byte forceUpdate) {
       if (AlarmTone == 0) 
         DisplayWord("X LOW", 500);
       else if (AlarmTone == 1) 
-        DisplayWord(" LOW ", 500);  
+        DisplayWord(" LOW ", 500);
       else if (AlarmTone == 2) 
-        DisplayWord(" MED ", 500);  
+        DisplayWord(" MED ", 500);
       else if (AlarmTone == 3) 
-        DisplayWord(" HIGH", 500);   
+        DisplayWord(" HIGH", 500); 
       else if (AlarmTone == 4) 
-        DisplayWord("SIREN", 500);   
+        DisplayWord("SIREN", 500); 
       else 
-        DisplayWord(" TINK", 500);   
+        DisplayWord(" TINK", 500); 
       ExtendTextDisplay = 1;
     }   
     else if (menuItem == SoundTestMenuItem)  // Alarm Test: 3
     {   
-      DisplayWord(" +/- ", 500);   
+      DisplayWord(" +/- ", 500); 
       if (optionValue != 0)
       { 
         if (alarmNow == 0)
@@ -1651,7 +1712,7 @@ void UpdateDisplay (byte forceUpdate) {
 
       if (optionValue != 0){ 
         if (optionValue == 1) 
-          temp = (temp + 1) & 3U;  
+          temp = (temp + 1) & 3U;
         else if (temp == 0) 
           temp = 3; 
         else
@@ -1677,7 +1738,7 @@ void UpdateDisplay (byte forceUpdate) {
         if ( DisplayMode & 8)
           temp = 3;
         if ( DisplayMode & 16)
-          temp = 4;    
+          temp = 4;  
 
         temp += optionValue;
 
@@ -1692,7 +1753,7 @@ void UpdateDisplay (byte forceUpdate) {
           DisplayMode |= (1 << temp);
         // if temp is 0 or 1, display time only.
 
-        DisplayModePhaseCount = 0;  
+        DisplayModePhaseCount = 0;
         optionValue = 0; 
 
       }
@@ -1768,13 +1829,13 @@ void UpdateDisplay (byte forceUpdate) {
       if (DST_mode == 0) 
         DisplayWord(" OFF", 500);
       else if (DST_mode == 1) 
-        DisplayWord(" ON  ", 500);  
+        DisplayWord(" ON  ", 500);
       else // (DST_mode == 2) 
-        DisplayWord(" AUTO", 500);  
+        DisplayWord(" AUTO", 500);
       ExtendTextDisplay = 1;
     }
 #endif
- 
+
 #ifdef FEATURE_WmGPS
    else if (menuItem == GPSMenuItem)
     {
@@ -1790,9 +1851,9 @@ void UpdateDisplay (byte forceUpdate) {
       if (GPS_mode == 0) 
         DisplayWord(" OFF", 500);
       else if (GPS_mode == 1) 
-        DisplayWord(" ON48", 500);  
+        DisplayWord(" ON48", 500);
       else // (GPS_mode == 2) 
-        DisplayWord(" ON96", 500);  
+        DisplayWord(" ON96", 500);
       ExtendTextDisplay = 1;
     }
 
@@ -1822,14 +1883,56 @@ void UpdateDisplay (byte forceUpdate) {
     }
 #endif
 
+#ifdef FEATURE_AUTODIM
+   else if (menuItem == AutoDimMenuItem)
+    {
+      AutoDimEnabled += optionValue;
+      AutoDimEnabled = AutoDimEnabled%2;  // 0 or 1
+      optionValue = 0;
+      if (AutoDimEnabled)
+        DisplayWord(" ON  ", 500);
+      else
+        DisplayWord(" OFF ", 500);
+      ExtendTextDisplay = 1;
+    }
+   else if (menuItem == AutoDimMenuHour1)
+    {
+      AutoDimHour1 += optionValue;
+      AutoDimHour1 = AutoDimHour1%24;
+      optionValue = 0;
+      TimeDisplay(51, forceUpdate); // Show AutoDimHour1
+    }
+   else if (menuItem == AutoDimMenuBright1)
+    {
+      AutoDimBright1 += optionValue;
+      AutoDimBright1 = AutoDimBright1%13;
+      optionValue = 0;
+      TimeDisplay(52, forceUpdate); // Show AutoDimBright1
+    }
+   else if (menuItem == AutoDimMenuHour2)
+    {
+      AutoDimHour2 += optionValue;
+      AutoDimHour2 = AutoDimHour2%24;
+      optionValue = 0;
+      TimeDisplay(53, forceUpdate); // Show AutoDimHour2
+    }
+   else if (menuItem == AutoDimMenuBright2)
+    {
+      AutoDimBright2 += optionValue;
+      AutoDimBright2 = AutoDimBright2%13;
+      optionValue = 0;
+      TimeDisplay(54, forceUpdate); // Show AutoDimBright1
+    }
+#endif
+
     if(forceUpdate && ExtendTextDisplay)
     {  
       if (menuItem != DisplayStyleMenuItem) 
       {   
-        a5clearOSB();    
+        a5clearOSB();  
         a5loadOSB_Ascii(wordCache,a5_brightLevel);
         a5loadOSB_DP(dpCache,a5_brightLevel);
-        a5BeginFadeToOSB();   
+        a5BeginFadeToOSB(); 
       }
     }
   }
@@ -1911,7 +2014,7 @@ void AdjDayMonthYear (int8_t AdjDay, int8_t AdjMonth, int8_t AdjYear)
 
    time_t timeTemp = now();
       
-  int yrTemp = year(timeTemp) + (int) AdjYear;  
+  int yrTemp = year(timeTemp) + (int) AdjYear;
   
   int moTemp = month(timeTemp) + AdjMonth;  // Avoid changing year, unless requested
   if (moTemp < 1)
@@ -1970,7 +2073,7 @@ void setDSToffset(uint8_t mode) {
   }
   time_t tNow = now();  // fetch current time & date
   tNow += adjOffset * SECS_PER_HOUR;  // add or subtract new DST offset
-  setTime(tNow);  
+  setTime(tNow);
   DST_updated = true;
   if (UseRTC)  
     RTC.set(now()); 
@@ -1980,6 +2083,15 @@ void setDSToffset(uint8_t mode) {
 }
 #endif
 
+void DisplayUpdate(char WordIn[], char DP1[], char DP2[]) {
+  a5clearOSB();
+  a5loadOSB_Ascii(WordIn,a5_brightLevel);  
+  if (AlarmIndicate())
+    a5loadOSB_DP(DP2,a5_brightLevel);   
+  else
+    a5loadOSB_DP(DP1,a5_brightLevel);   
+  a5BeginFadeToOSB(); 
+}
 
 void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
   byte temp;
@@ -2019,22 +2131,22 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
     byte HrNowTens,  HrNowOnes, MinNowTens,  MinNowOnes;
 
     if (DisplayModeLocal == 20)
-      temp = AlarmTimeHr;  
+      temp = AlarmTimeHr;
     else
       temp = hour(tNow); 
 
     if (HourMode24) 
-      units = 'H';  
+      units = 'H';
     else
     {  
         units = 'A'; 
        
       if (temp >= 12){
-        units = 'P';   
+        units = 'P'; 
       }       
       
       if (temp > 12){ 
-        temp -= 12;   //
+        temp -= 12; //
       }
        
       if (temp == 0)  // Represent 00:00 as 12:00
@@ -2055,7 +2167,7 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
     if (MinNowOnesLast != MinNowOnes)
       forceUpdateCopy = 1;
 
-    SecNow = second(tNow);    
+    SecNow = second(tNow);  
 
     if (SecLast != SecNow)
       forceUpdateCopy = 1;
@@ -2086,10 +2198,10 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
 
     if(forceUpdateCopy)
     { 
-      a5clearOSB();  
-      a5loadOSB_Ascii(WordIn,a5_brightLevel);    
+      a5clearOSB();
+      a5loadOSB_Ascii(WordIn,a5_brightLevel);  
 
-      if (DisplayModeLocal & 1)
+      if (DisplayModeLocal & 1)  // odd number, spinner mode
       {
         a5loadOSB_Segment (temp1, a5_brightLevel);  // wbp
         if (temp2 > 0)  // wbp
@@ -2099,7 +2211,7 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
       }
 
       if (AlarmIndicate())
-        a5loadOSB_DP("2____",a5_brightLevel);     
+        a5loadOSB_DP("2____",a5_brightLevel);   
 
 #ifdef FEATURE_WmGPS
       if (GPSupdating)  // wbp
@@ -2126,10 +2238,10 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
       else
         a5loadOSB_DP("01200",a5_brightLevel);  // non-flashing separator
 
-      a5BeginFadeToOSB();  
+      a5BeginFadeToOSB();
     }  
 
-    MinNowOnesLast = MinNowOnes;  
+    MinNowOnesLast = MinNowOnes;
 
   }
 
@@ -2144,17 +2256,7 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
     WordIn[2] =  SecNowTens + a5_integerOffset;
     WordIn[3] =  SecNowOnes + a5_integerOffset; 
     if(forceUpdateCopy)
-    { 
-      a5clearOSB();  
-      a5loadOSB_Ascii(WordIn,a5_brightLevel);    
-
-      if (AlarmIndicate())
-        a5loadOSB_DP("21200",a5_brightLevel);     
-      else
-        a5loadOSB_DP("01200",a5_brightLevel);     
-
-      a5BeginFadeToOSB(); 
-    } 
+      DisplayUpdate(WordIn, "01200", "21200");
     SecLast = SecNow; 
   }
 
@@ -2163,58 +2265,41 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
 
     if(forceUpdateCopy)
     {  
-      temp = day(tNow);  
+      temp = day(tNow);
 
-      byte monthTemp = 3 * ( month(tNow) - 1);  
+      byte monthTemp = 3 * ( month(tNow) - 1);
       //Month name (short):
       //      char a5monthShortNames_P[] PROGMEM = "JANFEBMARAPRMAYJUNJULAUGSEPOCTNOVDEC";
-      WordIn[0] = pgm_read_byte(&(a5_monthShortNames_P[monthTemp++]));  
+      WordIn[0] = pgm_read_byte(&(a5_monthShortNames_P[monthTemp++]));
       WordIn[1] = pgm_read_byte(&(a5_monthShortNames_P[monthTemp++]));
       WordIn[2] = pgm_read_byte(&(a5_monthShortNames_P[monthTemp]));
 
       byte divtemp =  U8DIVBY10(temp);  //i.e.,  divtemp = day / 10;
 
-      WordIn[3] =   divtemp + a5_integerOffset;  
-      WordIn[4] =  ( temp - 10 * divtemp) + a5_integerOffset;   
+      WordIn[3] =   divtemp + a5_integerOffset;
+      WordIn[4] =  ( temp - 10 * divtemp) + a5_integerOffset; 
 
-      a5clearOSB();  
-      a5loadOSB_Ascii(WordIn,a5_brightLevel);    
+      DisplayUpdate(WordIn, "00010", "20010");
 
-      if (AlarmIndicate())
-        a5loadOSB_DP("20100",a5_brightLevel);     
-      else
-        a5loadOSB_DP("00100",a5_brightLevel);     
-
-      a5BeginFadeToOSB(); 
     }  
     SecLast = SecNow; 
   }
   else if (DisplayModeLocal == 35)  //Year
   { 
 
-    unsigned int yeartemp = year(tNow);  
+    unsigned int yeartemp = year(tNow);
     unsigned int divtemp =  U16DIVBY10(yeartemp);  //i.e.,  divtemp = yeartemp / 10;
 
-    WordIn[4] =   yeartemp - 10 * divtemp + a5_integerOffset;  
+    WordIn[4] =   yeartemp - 10 * divtemp + a5_integerOffset;
     yeartemp = U16DIVBY10(divtemp); 
-    WordIn[3] =   divtemp - 10 * yeartemp + a5_integerOffset;  
+    WordIn[3] =   divtemp - 10 * yeartemp + a5_integerOffset;
     divtemp =  U16DIVBY10(yeartemp); 
-    WordIn[2] =   yeartemp - 10 * divtemp + a5_integerOffset;  
+    WordIn[2] =   yeartemp - 10 * divtemp + a5_integerOffset;
     yeartemp = U16DIVBY10(divtemp); 
-    WordIn[1] =   divtemp - 10 * yeartemp + a5_integerOffset;  
+    WordIn[1] =   divtemp - 10 * yeartemp + a5_integerOffset;
 
     if(forceUpdateCopy)
-    { 
-      a5clearOSB();  
-      a5loadOSB_Ascii(WordIn,a5_brightLevel);    
-
-      if (AlarmIndicate())
-        a5loadOSB_DP("20000",a5_brightLevel);     
-      else
-        a5loadOSB_DP("00000",a5_brightLevel);     
-
-      a5BeginFadeToOSB(); 
-    }   
+      DisplayUpdate(WordIn, "00000", "20000");
   }
   else if (DisplayModeLocal == 36)  //FLW - FIVE LETTER WORD mode
   {
@@ -2254,15 +2339,7 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
       if (temp < 50)
         WordIn[0] = 'Z'; 
 
-      a5clearOSB(); 
-      a5loadOSB_Ascii(WordIn,a5_brightLevel);    
-
-      if (AlarmIndicate())
-        a5loadOSB_DP("20000",a5_brightLevel);     
-      else
-        a5loadOSB_DP("00000",a5_brightLevel);     
-
-      a5BeginFadeToOSB(); 
+      DisplayUpdate(WordIn, "00000", "20000");
     }   
   }
 
@@ -2277,16 +2354,7 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
     WordIn[3] =  temp1%10 + a5_integerOffset;
 
     if(forceUpdateCopy)
-    {
-      a5clearOSB();
-      a5loadOSB_Ascii(WordIn,a5_brightLevel);
-      if (AlarmIndicate())
-        a5loadOSB_DP("20000",a5_brightLevel);
-      else
-        a5loadOSB_DP("00000",a5_brightLevel);
-      a5BeginFadeToOSB();
-    } 
-
+      DisplayUpdate(WordIn, "00000", "20000");
   }
 
   else if (DisplayModeLocal == 42)  // Time Zone Minutes
@@ -2296,16 +2364,42 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
     WordIn[3] =  TZ_minutes%10 + a5_integerOffset;
 
     if(forceUpdateCopy)
-    {
-      a5clearOSB();
-      a5loadOSB_Ascii(WordIn,a5_brightLevel);
-      if (AlarmIndicate())
-        a5loadOSB_DP("20000",a5_brightLevel);
-      else
-        a5loadOSB_DP("00000",a5_brightLevel);
-      a5BeginFadeToOSB();
-    }
+      DisplayUpdate(WordIn, "00000", "20000");
+  }
+#endif
 
+#ifdef FEATURE_AUTODIM
+  else if (DisplayModeLocal == 51)  // AutoDim Hour 1
+  {
+    unsigned int temp1 = AutoDimHour1;
+    WordIn[2] =  U16DIVBY10(temp1) + a5_integerOffset;
+    WordIn[3] =  temp1%10 + a5_integerOffset;
+    if(forceUpdateCopy)
+      DisplayUpdate(WordIn, "00000", "20000");
+  }
+  else if (DisplayModeLocal == 52)  // AutoDim Bright 1
+  {
+    unsigned int temp1 = AutoDimBright1;
+    WordIn[2] =  U16DIVBY10(temp1) + a5_integerOffset;
+    WordIn[3] =  temp1%10 + a5_integerOffset;
+    if(forceUpdateCopy)
+      DisplayUpdate(WordIn, "00000", "20000");
+  }
+  else if (DisplayModeLocal == 53)  // AutoDim Hour 2
+  {
+    unsigned int temp1 = AutoDimHour2;
+    WordIn[2] =  U16DIVBY10(temp1) + a5_integerOffset;
+    WordIn[3] =  temp1%10 + a5_integerOffset;
+    if(forceUpdateCopy)
+      DisplayUpdate(WordIn, "00000", "20000");
+  }
+  else if (DisplayModeLocal == 54)  // AutoDim Bright 2
+  {
+    unsigned int temp1 = AutoDimBright2;
+    WordIn[2] =  U16DIVBY10(temp1) + a5_integerOffset;
+    WordIn[3] =  temp1%10 + a5_integerOffset;
+    if(forceUpdateCopy)
+      DisplayUpdate(WordIn, "00000", "20000");
   }
 #endif
 
@@ -2318,7 +2412,7 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
 void SerialPrintTime(){
   //   Print time over serial interface.   Adapted from Time library.
 
-	time_t timeTmp = now();  
+	time_t timeTmp = now();
 
   Serial.print(hour(timeTmp));
   printDigits(minute(timeTmp));
@@ -2354,7 +2448,7 @@ void ApplyDefaults (void) {
   AlarmTimeHr =     a5AlarmHrDefault;
   AlarmTimeMin =    a5AlarmMinDefault;
   AlarmTone =       a5AlarmToneDefault;
-  NightLightType =  a5NightLightTypeDefault;  
+  NightLightType =  a5NightLightTypeDefault;
   numberCharSet =   a5NumberCharSetDefault;
 #ifdef FEATURE_AUTODST
   DST_mode =        a5GPSModeDefault;
@@ -2364,6 +2458,13 @@ void ApplyDefaults (void) {
   TZ_hour =         a5TZHourDefault;
   TZ_minutes =      a5TZMinutesDefault;
 #endif
+#ifdef FEATURE_AUTODIM
+  AutoDimEnabled =  a5AutoDimEnabledDefault;
+  AutoDimHour1 =    a5AutoDimHour1Default;
+  AutoDimBright1 =  a5AutoDimBright1Default;
+  AutoDimHour2 =    a5AutoDimHour2Default;
+  AutoDimBright2 =  a5AutoDimBright2Default;
+#endif
 
 }
 
@@ -2372,12 +2473,12 @@ void ApplyDefaults (void) {
 void EEReadSettings (void) {  
   // Check values for sanity at THIS stage.
   byte value = 255;
-  value = EEPROM.read(0);      
+  value = EEPROM.read(0);    
 
   if ((value > 100 + BrightnessMax) || (value < 100))
     Brightness = a5brightLevelDefault;
   else  
-    Brightness = value - 100;   
+    Brightness = value - 100; 
 
   value = EEPROM.read(1);
   if (value > 1)
@@ -2395,25 +2496,25 @@ void EEReadSettings (void) {
   if ((value > 123) || (value < 100))
     AlarmTimeHr = a5AlarmHrDefault;
   else  
-    AlarmTimeHr = value - 100;   
+    AlarmTimeHr = value - 100; 
 
   value = EEPROM.read(4);
   if ((value > 159) || (value < 100))
     AlarmTimeMin = a5AlarmMinDefault;
   else  
-    AlarmTimeMin = value - 100;   
+    AlarmTimeMin = value - 100; 
 
   value = EEPROM.read(5);
   if (value > 5)
     AlarmTone = a5AlarmToneDefault;
   else  
-    AlarmTone = value;   
+    AlarmTone = value; 
 
   value = EEPROM.read(6);
   if (value > 4)
-    NightLightType = a5NightLightTypeDefault;  
+    NightLightType = a5NightLightTypeDefault;
   else  
-    NightLightType = value;    
+    NightLightType = value;  
 
   value = EEPROM.read(7);
   if (value > 9)
@@ -2455,6 +2556,33 @@ void EEReadSettings (void) {
     TZ_minutes = value;
 #endif
 
+#ifdef FEATURE_AUTODIM
+  value = EEPROM.read(13);
+  if (value > 1)
+    AutoDimEnabled = a5AutoDimEnabledDefault;
+  else  
+    AutoDimEnabled = value;
+  value = EEPROM.read(14);  // hour 1
+  if (value > 23)
+    AutoDimHour1 = a5AutoDimHour1Default;
+  else  
+    AutoDimHour1 = value;
+  value = EEPROM.read(15);
+  if (value > 12)
+    AutoDimBright1 = a5AutoDimBright1Default;
+  else  
+    AutoDimBright1 = value;
+  value = EEPROM.read(16);  // hour 1
+  if (value > 23)
+    AutoDimHour2 = a5AutoDimHour2Default;
+  else  
+    AutoDimHour2 = value;
+  value = EEPROM.read(17);
+  if (value > 2)
+    AutoDimBright2 = a5AutoDimBright2Default;
+  else  
+    AutoDimBright2 = value;
+#endif
 }
 
 void EESaveSettings (void){ 
@@ -2472,78 +2600,106 @@ void EESaveSettings (void){
     // cycles in its life.  Good for human-operated buttons, bad for automation.
     // Also, no error checking is provided at this, the write EEPROM stage.
 
-    value = EEPROM.read(0);  
+    value = EEPROM.read(0);
     if (Brightness != (value - 100))  {
-      a5writeEEPROM(0, Brightness + 100);  
+      a5writeEEPROM(0, Brightness + 100);
       //NOTE:  Do not blink LEDs off to indicate saving of this value
     }
-    value = EEPROM.read(1);  
+    value = EEPROM.read(1);
     if (HourMode24 != value)  { 
       a5writeEEPROM(1, HourMode24); 
       indicateEEPROMwritten = 1;
     } 
-    value = EEPROM.read(2);  
+    value = EEPROM.read(2);
     if (AlarmEnabled != value)  {
-      a5writeEEPROM(2, AlarmEnabled);  
+      a5writeEEPROM(2, AlarmEnabled);
       //NOTE:  Do not blink LEDs off to indicate saving of this value
     } 
-    value = EEPROM.read(3);  
+    value = EEPROM.read(3);
     if (AlarmTimeHr != (value - 100))  { 
       a5writeEEPROM(3, AlarmTimeHr + 100); 
       //NOTE:  Do not blink LEDs off to indicate saving of this value
     }
-    value = EEPROM.read(4);  
+    value = EEPROM.read(4);
     if (AlarmTimeMin != (value - 100)){
       a5writeEEPROM(4, AlarmTimeMin + 100); 
       //NOTE:  Do not blink LEDs off to indicate saving of this value
     }
-    value = EEPROM.read(5);  
+    value = EEPROM.read(5);
     if (AlarmTone != value){ 
       a5writeEEPROM(5, AlarmTone);
       indicateEEPROMwritten = 1;
     }
-    value = EEPROM.read(6);  
+    value = EEPROM.read(6);
     if (NightLightType != value){
-      a5writeEEPROM(6, NightLightType);  
+      a5writeEEPROM(6, NightLightType);
       indicateEEPROMwritten = 1;
     }
-    value = EEPROM.read(7);  
+    value = EEPROM.read(7);
     if (numberCharSet != value){
-      a5writeEEPROM(7, numberCharSet);  
+      a5writeEEPROM(7, numberCharSet);
       indicateEEPROMwritten = 1;
     }
-    value = EEPROM.read(8);  
+    value = EEPROM.read(8);
     if (DisplayMode != value){
-      a5writeEEPROM(8, DisplayMode);  
+      a5writeEEPROM(8, DisplayMode);
       indicateEEPROMwritten = 1;
     }      
 #ifdef FEATURE_AUTODST
-    value = EEPROM.read(9);  
+    value = EEPROM.read(9);
     if (DST_mode != value){
-      a5writeEEPROM(9, DST_mode);  
+      a5writeEEPROM(9, DST_mode);
       indicateEEPROMwritten = 1;
     }      
 #endif
 #ifdef FEATURE_WmGPS
-    value = EEPROM.read(10);  
+    value = EEPROM.read(10);
     if (GPS_mode != value){
-      a5writeEEPROM(10, GPS_mode);  
+      a5writeEEPROM(10, GPS_mode);
       indicateEEPROMwritten = 1;
     }      
-    value = EEPROM.read(11);  
+    value = EEPROM.read(11);
     if ((TZ_hour+12) != value){
-      a5writeEEPROM(11, TZ_hour+12);  
+      a5writeEEPROM(11, TZ_hour+12);
       indicateEEPROMwritten = 1;
     }      
-    value = EEPROM.read(12);  
+    value = EEPROM.read(12);
     if (TZ_minutes != value){
-      a5writeEEPROM(12, TZ_minutes);  
+      a5writeEEPROM(12, TZ_minutes);
       indicateEEPROMwritten = 1;
     }
 #endif
+#ifdef FEATURE_AUTODIM
+    value = EEPROM.read(13);
+    if (AutoDimEnabled != value){
+      a5writeEEPROM(13, AutoDimEnabled);
+      indicateEEPROMwritten = 1;
+    }
+    value = EEPROM.read(14);
+    if (AutoDimHour1 != value){
+      a5writeEEPROM(14, AutoDimHour1);
+      indicateEEPROMwritten = 1;
+    }
+    value = EEPROM.read(15);
+    if (AutoDimBright1 != value){
+      a5writeEEPROM(15, AutoDimBright1);
+      indicateEEPROMwritten = 1;
+    }
+    value = EEPROM.read(16);
+    if (AutoDimHour2 != value){
+      a5writeEEPROM(16, AutoDimHour2);
+      indicateEEPROMwritten = 1;
+    }
+    value = EEPROM.read(17);
+    if (AutoDimBright2 != value){
+      a5writeEEPROM(17, AutoDimBright2);
+      indicateEEPROMwritten = 1;
+    }
+
+#endif
 
     if (indicateEEPROMwritten) { // Blink LEDs off to indicate when we're writing to the EEPROM 
-      DisplayWord ("SAVED", 500);  
+      DisplayWord ("SAVED", 500);
     }
 
     UpdateEE = 0;
