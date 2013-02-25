@@ -144,8 +144,10 @@ void  EndVCRmode(void);
 #define a5AutoDimEnabledDefault 0
 #define a5AutoDimHour1Default 7
 #define a5AutoDimBright1Default 11
-#define a5AutoDimHour2Default 22
-#define a5AutoDimBright2Default 5
+#define a5AutoDimHour2Default 18
+#define a5AutoDimBright2Default 8
+#define a5AutoDimHour3Default 22
+#define a5AutoDimBright3Default 5
 #endif
 
 // Clock mode variables
@@ -193,7 +195,9 @@ int8_t optionValue;
 #define AutoDimMenuBright1 17
 #define AutoDimMenuHour2 18
 #define AutoDimMenuBright2 19
-#define MenuItemsMax 19
+#define AutoDimMenuHour3 20
+#define AutoDimMenuBright3 21
+#define MenuItemsMax 21
 #endif
 
 // Clock display mode:
@@ -271,10 +275,12 @@ byte SoundSequence;
 
 #ifdef FEATURE_AUTODIM
 byte AutoDimEnabled = false;
-byte AutoDimHour1 = 7;
-byte AutoDimBright1 = 11;
-byte AutoDimHour2 = 22;
-byte AutoDimBright2 = 5;
+int8_t AutoDimHour1 = 7;
+int8_t AutoDimBright1 = 11;
+int8_t AutoDimHour2 = 18;
+int8_t AutoDimBright2 = 8;
+int8_t AutoDimHour3 = 22;
+int8_t AutoDimBright3 = 5;
 #endif
 
 void incrementAlarm(void)
@@ -315,8 +321,8 @@ void TurnOffAlarm(void)
     alarmNow = 0;
     a5noTone();
 
-    if (modeShowMenu == 0) 
-			DisplayWords("ALARM", "STOP ", 800); // Display: "ALARM OFF", EXCEPT if we are in the menus.
+    if (modeShowMenu == 0)
+        DisplayWords("ALARM", "STOP ", 800); // Display: "ALARM OFF", EXCEPT if we are in the menus.
   }
 }  
 
@@ -822,6 +828,12 @@ void DisplayMenuOptionName(void){
   case AutoDimMenuBright2:
     DisplayWord("A2BRT", 800);
     break;
+  case AutoDimMenuHour3:
+    DisplayWord("A3HR ", 800);
+    break;
+  case AutoDimMenuBright3:
+    DisplayWord("A3BRT", 800);
+    break;
 #endif
   default:  // do nothing!
     break;
@@ -1276,6 +1288,11 @@ void loop() {
         else if (AutoDimHour2 == tHour)
         {
           Brightness = AutoDimBright2;
+          UpdateBrightness = 1;
+        }
+        else if (AutoDimHour3 == tHour)
+        {
+          Brightness = AutoDimBright3;
           UpdateBrightness = 1;
         }
       }
@@ -1898,30 +1915,62 @@ void UpdateDisplay (byte forceUpdate) {
    else if (menuItem == AutoDimMenuHour1)
     {
       AutoDimHour1 += optionValue;
-      AutoDimHour1 = AutoDimHour1%24;
+      if (AutoDimHour1<0)
+        AutoDimHour1 = 24;
+      if (AutoDimHour1>24)
+        AutoDimHour1 = 0;
       optionValue = 0;
       TimeDisplay(51, forceUpdate); // Show AutoDimHour1
     }
    else if (menuItem == AutoDimMenuBright1)
     {
       AutoDimBright1 += optionValue;
-      AutoDimBright1 = AutoDimBright1%13;
+      if (AutoDimBright1<0)
+        AutoDimBright1 = 12;
+      if (AutoDimBright1>12)
+        AutoDimBright1 = 0;
       optionValue = 0;
       TimeDisplay(52, forceUpdate); // Show AutoDimBright1
     }
    else if (menuItem == AutoDimMenuHour2)
     {
       AutoDimHour2 += optionValue;
-      AutoDimHour2 = AutoDimHour2%24;
+      if (AutoDimHour2<0)
+        AutoDimHour2 = 24;
+      if (AutoDimHour2>24)
+        AutoDimHour2 = 0;
       optionValue = 0;
       TimeDisplay(53, forceUpdate); // Show AutoDimHour2
     }
    else if (menuItem == AutoDimMenuBright2)
     {
       AutoDimBright2 += optionValue;
-      AutoDimBright2 = AutoDimBright2%13;
+      if (AutoDimBright2<0)
+        AutoDimBright2 = 12;
+      if (AutoDimBright2>12)
+        AutoDimBright2 = 0;
       optionValue = 0;
       TimeDisplay(54, forceUpdate); // Show AutoDimBright1
+    }
+   else if (menuItem == AutoDimMenuHour3)
+    {
+      AutoDimHour3 += optionValue;
+      if (AutoDimHour3<0)
+        AutoDimHour3 = 24;
+      if (AutoDimHour3>24)
+        AutoDimHour3 = 0;
+      optionValue = 0;
+      TimeDisplay(55, forceUpdate); // Show AutoDimHour2
+    }
+   else if (menuItem == AutoDimMenuBright3)
+    {
+      AutoDimBright3 += optionValue;
+      if (AutoDimBright3<0)
+        AutoDimBright3 = 12;
+      if (AutoDimBright3>12)
+        AutoDimBright3 = 0;
+      optionValue = 0;
+      TimeDisplay(56, forceUpdate); // Show AutoDimBright1
     }
 #endif
 
@@ -2401,6 +2450,22 @@ void TimeDisplay (byte DisplayModeLocal, byte forceUpdateCopy)  {
     if(forceUpdateCopy)
       DisplayUpdate(WordIn, "00000", "20000");
   }
+  else if (DisplayModeLocal == 55)  // AutoDim Hour 3
+  {
+    unsigned int temp1 = AutoDimHour3;
+    WordIn[2] =  U16DIVBY10(temp1) + a5_integerOffset;
+    WordIn[3] =  temp1%10 + a5_integerOffset;
+    if(forceUpdateCopy)
+      DisplayUpdate(WordIn, "00000", "20000");
+  }
+  else if (DisplayModeLocal == 56)  // AutoDim Bright 3
+  {
+    unsigned int temp1 = AutoDimBright3;
+    WordIn[2] =  U16DIVBY10(temp1) + a5_integerOffset;
+    WordIn[3] =  temp1%10 + a5_integerOffset;
+    if(forceUpdateCopy)
+      DisplayUpdate(WordIn, "00000", "20000");
+  }
 #endif
 
   DisplayModeLocalLast = DisplayModeLocal;
@@ -2464,6 +2529,8 @@ void ApplyDefaults (void) {
   AutoDimBright1 =  a5AutoDimBright1Default;
   AutoDimHour2 =    a5AutoDimHour2Default;
   AutoDimBright2 =  a5AutoDimBright2Default;
+  AutoDimHour3 =    a5AutoDimHour3Default;
+  AutoDimBright3 =  a5AutoDimBright3Default;
 #endif
 
 }
@@ -2572,16 +2639,26 @@ void EEReadSettings (void) {
     AutoDimBright1 = a5AutoDimBright1Default;
   else  
     AutoDimBright1 = value;
-  value = EEPROM.read(16);  // hour 1
+  value = EEPROM.read(16);  // hour 2
   if (value > 23)
     AutoDimHour2 = a5AutoDimHour2Default;
   else  
     AutoDimHour2 = value;
   value = EEPROM.read(17);
-  if (value > 2)
+  if (value > 12)
     AutoDimBright2 = a5AutoDimBright2Default;
   else  
     AutoDimBright2 = value;
+  value = EEPROM.read(18);  // hour 3
+  if (value > 23)
+    AutoDimHour3 = a5AutoDimHour3Default;
+  else  
+    AutoDimHour3 = value;
+  value = EEPROM.read(19);
+  if (value > 12)
+    AutoDimBright3 = a5AutoDimBright3Default;
+  else  
+    AutoDimBright3 = value;
 #endif
 }
 
@@ -2693,6 +2770,16 @@ void EESaveSettings (void){
     value = EEPROM.read(17);
     if (AutoDimBright2 != value){
       a5writeEEPROM(17, AutoDimBright2);
+      indicateEEPROMwritten = 1;
+    }
+    value = EEPROM.read(18);
+    if (AutoDimHour3 != value){
+      a5writeEEPROM(18, AutoDimHour3);
+      indicateEEPROMwritten = 1;
+    }
+    value = EEPROM.read(19);
+    if (AutoDimBright3 != value){
+      a5writeEEPROM(19, AutoDimBright3);
       indicateEEPROMwritten = 1;
     }
 
