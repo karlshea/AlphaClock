@@ -1920,7 +1920,12 @@ void UpdateDisplay (byte forceUpdate) {
       if (AutoDimHour1>24)
         AutoDimHour1 = 0;
       optionValue = 0;
-      TimeDisplay(51, forceUpdate); // Show AutoDimHour1
+      if (AutoDimHour1 == 24) {
+        DisplayWord("  OFF", 500);
+        ExtendTextDisplay = 1;
+      }
+      else
+        TimeDisplay(51, forceUpdate); // Show AutoDimHour1
     }
    else if (menuItem == AutoDimMenuBright1)
     {
@@ -1940,7 +1945,12 @@ void UpdateDisplay (byte forceUpdate) {
       if (AutoDimHour2>24)
         AutoDimHour2 = 0;
       optionValue = 0;
-      TimeDisplay(53, forceUpdate); // Show AutoDimHour2
+      if (AutoDimHour2 == 24) {
+        DisplayWord("  OFF", 500);
+        ExtendTextDisplay = 1;
+      }
+      else
+        TimeDisplay(53, forceUpdate); // Show AutoDimHour1
     }
    else if (menuItem == AutoDimMenuBright2)
     {
@@ -1960,7 +1970,12 @@ void UpdateDisplay (byte forceUpdate) {
       if (AutoDimHour3>24)
         AutoDimHour3 = 0;
       optionValue = 0;
-      TimeDisplay(55, forceUpdate); // Show AutoDimHour2
+      if (AutoDimHour3 == 24) {
+        DisplayWord("  OFF", 500);
+        ExtendTextDisplay = 1;
+      }
+      else
+        TimeDisplay(55, forceUpdate); // Show AutoDimHour1
     }
    else if (menuItem == AutoDimMenuBright3)
     {
