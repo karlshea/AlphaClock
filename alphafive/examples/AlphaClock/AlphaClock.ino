@@ -1,5 +1,15 @@
 /*
 
+AlphaClock.ino
+
+Firmware for the Alpha Clock Five by Karl Shea
+Version 2.1.14 - 16 July 2016
+
+CHANGES:
+- add photoresistor support for automatically dimming the display
+
+ ------------------------------------------------------------
+
 AlphaClock.ino 
 
 Firmware for the Alpha Clock Five by William B Phelps
@@ -92,6 +102,9 @@ TODO:
 // Note - GPS support has not been tested without AUTODST enabled
 #define FEATURE_AUTODST
 #define FEATURE_WmGPS
+ 
+// Enable automatically dimming the display with a photoresistor
+#define FEATURE_AUTODIM
 
 // NOTE: uncomment either of the following two "define" statements to enable the optional feature
 // Use S1+S2 for Menu, S3+S4 for test mode
@@ -133,8 +146,8 @@ void  EndVCRmode(void);
 #endif
 #ifdef FEATURE_WmGPS
 #define a5GPSModeDefault 0  // default no GPS
-#define a5TZHourDefault -8  // default Pacific Time zone
-#define a5TZMinutesDefault 0  // default Pacific Time zone
+#define a5TZHourDefault -6  // default Central Time zone
+#define a5TZMinutesDefault 0  // default Central Time zone
 #endif
 
 // Clock mode variables
@@ -195,6 +208,11 @@ byte UseRTC;
 unsigned long NextClockUpdate, NextAlarmCheck;
 unsigned long milliTemp;
 unsigned int FLWoffset; // Counter variable for FLW (Five Letter Word) display mode
+
+#ifdef FEATURE_AUTODIM
+unsigned long NextDimCheck;
+int photocellPin = 7; // Analog pin the photoresistor is attached to
+#endif
 
 // Text Display Variables: 
 unsigned long DisplayWordEndTime;
@@ -1062,6 +1080,10 @@ void setup() {
   NextButtonCheck = NextClockUpdate;
   NextAlarmCheck =  NextClockUpdate;
 
+#ifdef FEATURE_AUTODIM
+  NextDimCheck = NextClockUpdate;
+#endif
+
   UpdateEE = 0;
   LastButtonPress = NextClockUpdate;
 
@@ -1119,6 +1141,26 @@ void loop() {
   tNow = now();  // fetch time & date (wbp)
   milliTemp = millis();
   checkButtons();
+
+
+#ifdef FEATURE_AUTODIM
+  // Autodim update brightness level
+  if (milliTemp >= NextDimCheck)
+  {
+    NextDimCheck = milliTemp + 1000;
+    int photocellReading = analogRead(photocellPin);
+    byte NewBrightness = map(photocellReading, 1, 1023, 1, BrightnessMax);
+    
+    if (NewBrightness != Brightness) {
+      Serial.print("Setting new brightness ");
+      Serial.print(NewBrightness);
+      Serial.print(" for photocell reading ");
+      Serial.println(photocellReading);
+      Brightness = NewBrightness;
+      UpdateBrightness = 1;
+    }
+  }
+#endif
 
   if (UpdateBrightness)
   {
@@ -1956,6 +1998,9 @@ void setDSToffset(uint8_t mode) {
   adjOffset = newOffset - DST_offset;  // offset delta
   if (adjOffset == 0)  return;  // nothing to do
   // play tones to indicate DST time adjustment, up or down
+  
+  // no tones
+  /*
   if (adjOffset > 0)
   {
     a5tone(220, 100);
@@ -1967,7 +2012,8 @@ void setDSToffset(uint8_t mode) {
     a5tone(2220, 100);
     delay(200);
     a5tone(220, 100);
-  }
+  }*/
+  
   time_t tNow = now();  // fetch current time & date
   tNow += adjOffset * SECS_PER_HOUR;  // add or subtract new DST offset
   setTime(tNow);  
