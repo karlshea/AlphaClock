@@ -1158,7 +1158,7 @@ void loop() {
     
     if (shouldUpdateBrightness(Brightness, BrightnessMax)) {
 		 	Serial.print("Setting new brightness ");
-      Serial.print(NewBrightness);
+      Serial.println(NewBrightness);
       Brightness = NewBrightness;
       UpdateBrightness = 1;
     }
