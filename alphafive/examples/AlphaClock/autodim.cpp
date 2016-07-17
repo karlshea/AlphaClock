@@ -29,8 +29,8 @@ bool shouldUpdateBrightness(byte Brightness, byte BrightnessMax) {
     // Bump up reading when it's brighter out to compensate for recessed cell
     if (photoReading > 500 && photoReading < 923) photoReading += 100;
 
-    Serial.print("Photocell: ");
-    Serial.println(photocellReading);
+    //Serial.print("Photocell: ");
+    //Serial.println(photoReading);
     
     // Set new brightness
     NewBrightness = map(photoReading, 0, 1023, 1, BrightnessMax);
