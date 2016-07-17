@@ -18,7 +18,6 @@
 int photoPin = 7; // Analog pin the photoresistor is attached to
 int photoReading = 0;  // Current photocell reading
 int photoReadingLast = 0; // Last photocell reading for comparison
-int photoUpdateFluctuation = 50;
 byte NewBrightness = 0;  // New brightness level
 
 bool shouldUpdateBrightness(byte Brightness, byte BrightnessMax) {
@@ -27,7 +26,7 @@ bool shouldUpdateBrightness(byte Brightness, byte BrightnessMax) {
     photoReading = analogRead(photoPin);
     
     // Bump up reading when it's brighter out to compensate for recessed cell
-    if (photoReading > 500 && photoReading < 923) photoReading += 100;
+    if (photoReading > 400 && photoReading < 923) photoReading += 100;
 
     //Serial.print("Photocell: ");
     //Serial.println(photoReading);
@@ -36,6 +35,6 @@ bool shouldUpdateBrightness(byte Brightness, byte BrightnessMax) {
     NewBrightness = map(photoReading, 0, 1023, 1, BrightnessMax);
 
     // Should update if the reading fluctuated greatly and the new brightness maps differently
-    return abs(photoReading - photoReadingLast) > photoUpdateFluctuation 
+    return abs(photoReading - photoReadingLast) > 50 
       && NewBrightness != Brightness;
 }
