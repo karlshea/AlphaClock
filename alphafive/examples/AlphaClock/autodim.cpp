@@ -1,5 +1,5 @@
 /*
- * Auto-dimming photocell support
+ * Auto-dimming photoresistor support
  * (C) 2016 Karl Shea
  *
  * This program is free software; you can redistribute it and/or modify it under the
@@ -15,27 +15,27 @@
 
 #include "autodim.h"
 
-int photocellPin = 7; // Analog pin the photoresistor is attached to
-int photocellReading = 0;  // Current photocell reading
-int photocellReadingLast = 0; // Last photocell reading for comparison
-int photocellUpdateFluctuation = 50;
+int photoPin = 7; // Analog pin the photoresistor is attached to
+int photoReading = 0;  // Current photocell reading
+int photoReadingLast = 0; // Last photocell reading for comparison
+int photoUpdateFluctuation = 50;
 byte NewBrightness = 0;  // New brightness level
 
 bool shouldUpdateBrightness(byte Brightness, byte BrightnessMax) {
     // Store last reading and read again
-    photocellReadingLast = photocellReading;
-    photocellReading = analogRead(photocellPin);
+    photoReadingLast = photoReading;
+    photoReading = analogRead(photoPin);
     
     // Bump up reading when it's brighter out to compensate for recessed cell
-    if (photocellReading > 500 && photocellReading < 923) photocellReading += 100;
+    if (photoReading > 500 && photoReading < 923) photoReading += 100;
 
     Serial.print("Photocell: ");
     Serial.println(photocellReading);
     
     // Set new brightness
-    NewBrightness = map(photocellReading, 0, 1023, 1, BrightnessMax);
+    NewBrightness = map(photoReading, 0, 1023, 1, BrightnessMax);
 
     // Should update if the reading fluctuated greatly and the new brightness maps differently
-    return abs(photocellReading - photocellReadingLast) > photocellUpdateFluctuation 
+    return abs(photoReading - photoReadingLast) > photoUpdateFluctuation 
       && NewBrightness != Brightness;
 }
