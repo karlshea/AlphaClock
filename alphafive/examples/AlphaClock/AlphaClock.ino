@@ -127,6 +127,10 @@ void  EndVCRmode(void);
 #include "gps.h"  // wbp GPS support
 #endif
 
+#ifdef FEATURE_AUTODIM
+#include "autodim.h"
+#endif
+
 // Comment out exactly one of the following two lines
 #include "fiveletterwords.h"   // Standard word list --
 //#include "fiveletterwordspd.h" // Public domain alternative
@@ -211,7 +215,6 @@ unsigned int FLWoffset; // Counter variable for FLW (Five Letter Word) display m
 
 #ifdef FEATURE_AUTODIM
 unsigned long NextDimCheck;
-int photocellPin = 7; // Analog pin the photoresistor is attached to
 #endif
 
 // Text Display Variables: 
@@ -703,6 +706,7 @@ void checkButtons(void )
           if (AlarmTimeChanged > 0)
             AlarmTimeChanged = 1;  // Acknowledge that the button has been released, for purposes of time editing. 
 
+#ifndef FEATURE_AUTODIM
           // IF no other buttons are down, increase brightness:
           if (((buttonMonitor & a5_allButtonsButPlus) == 0) && (AlarmTimeChanged + TimeChanged == 0))
             if (Brightness < BrightnessMax)
@@ -711,6 +715,7 @@ void checkButtons(void )
               UpdateBrightness = 1;
               UpdateEE = 1;
             } 
+#endif
         }
       }
 
@@ -722,6 +727,7 @@ void checkButtons(void )
           if (AlarmTimeChanged > 0)
             AlarmTimeChanged = 1;  // Acknowledge that the button has been released, for purposes of time editing. 
 
+#ifndef FEATURE_AUTODIM
           // IF no other buttons are down, and times have not been adjusted, decrease brightness:
           if(((buttonMonitor & a5_allButtonsButMinus) == 0) && (AlarmTimeChanged + TimeChanged == 0))
             if (Brightness > 0)
@@ -730,6 +736,7 @@ void checkButtons(void )
               UpdateBrightness = 1; 
               UpdateEE = 1;
             }  
+#endif
         }
       }
     } // End not-in-config-menu statements
@@ -1148,14 +1155,10 @@ void loop() {
   if (milliTemp >= NextDimCheck)
   {
     NextDimCheck = milliTemp + 1000;
-    int photocellReading = analogRead(photocellPin);
-    byte NewBrightness = map(photocellReading, 1, 1023, 1, BrightnessMax);
     
-    if (NewBrightness != Brightness) {
-      Serial.print("Setting new brightness ");
+    if (shouldUpdateBrightness(Brightness, BrightnessMax)) {
+		 	Serial.print("Setting new brightness ");
       Serial.print(NewBrightness);
-      Serial.print(" for photocell reading ");
-      Serial.println(photocellReading);
       Brightness = NewBrightness;
       UpdateBrightness = 1;
     }
